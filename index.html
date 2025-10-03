@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skills Selector</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header full-bleed">
+            <div class="nav-bar">
+                <h1>Skills Selector</h1>
+                <nav class="nav">
+                    <div class="dropdown">
+                        <button class="dropbtn">Menu ▾</button>
+                        <div class="dropdown-content">
+                            <a href="users.html" target="_blank" rel="noopener">Users</a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Email Input Section -->
+            <section class="email-section" id="emailSection">
+                <div class="card">
+                    <h2>Welcome</h2>
+                    <p>Please enter your email to begin selecting your skills.</p>
+                    <div class="input-group">
+                        <input 
+                            type="email" 
+                            id="emailInput" 
+                            placeholder="Enter your email address"
+                            required
+                        >
+                        <button id="submitEmailBtn" class="btn btn-primary">Continue</button>
+                    </div>
+                    <div id="emailError" class="error-message"></div>
+                </div>
+            </section>
+
+            <!-- Skills Selection Section -->
+            <section class="skills-section" id="skillsSection" style="display: none;">
+                <!-- User Info -->
+                <div class="user-info">
+                    <h3>Welcome, <span id="userEmail"></span></h3>
+                </div>
+
+                <!-- Selected Skills Display -->
+                <div class="selected-skills-container">
+                    <h3>Selected Skills</h3>
+                    <div id="selectedSkillsDisplay" class="selected-skills">
+                        <p class="empty-message">Please select your skills</p>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="saveSkillsBtn" class="btn btn-success" style="display: none;">Save Skills</button>
+                    </div>
+                </div>
+
+                <!-- Skills Explorer -->
+                <div class="skills-explorer">
+                    <h3>Explore Skills</h3>
+                    
+                    <!-- Level 1 Skills -->
+                    <div class="skills-level">
+                        <h4>Primary Skill Areas</h4>
+                        <div id="level1Skills" class="skills-grid"></div>
+                    </div>
+
+                    <!-- Level 2 Skills -->
+                    <div class="skills-level" id="level2Container" style="display: none;">
+                        <h4>Specialized Areas</h4>
+                        <div id="level2Skills" class="skills-grid"></div>
+                    </div>
+
+                    <!-- Level 3 Skills -->
+                    <div class="skills-level" id="level3Container" style="display: none;">
+                        <h4>Specific Skills</h4>
+                        <div id="level3Skills" class="skills-grid"></div>
+                    </div>
+                    <div class="explorer-footer">
+                        <button id="viewSelectedBtn" class="btn btn-primary secondary-action" style="display:none;">View Selected Skills ↑</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+
+        <!-- Toast Messages -->
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

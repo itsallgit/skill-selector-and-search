@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Users - Skills Selector</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .users-container { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+    .users-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
+    .users-list { margin-top:1.5rem; background:#fff; border:1px solid #e5e5e5; border-radius:10px; padding:1rem 1.25rem; }
+    .user-row { display:flex; justify-content:space-between; padding:0.75rem 0; border-bottom:1px solid #f0f0f0; font-size:0.95rem; }
+    .user-row:last-child { border-bottom:none; }
+    .user-email { font-weight:600; word-break:break-all; }
+    .badge { background:#79c03f; color:#fff; border-radius:20px; padding:0.25rem 0.75rem; font-size:0.75rem; font-weight:600; }
+    .muted { color:#666; }
+    .empty { text-align:center; padding:2rem 0; color:#666; font-style:italic; }
+  </style>
+</head>
+<body>
+  <header class="header full-bleed">
+    <div class="nav-bar">
+      <h1>Users</h1>
+  <nav class="nav"><a class="dropbtn back-nav" href="index.html">← Back</a></nav>
+    </div>
+  </header>
+  <div class="users-container">
+    <div class="users-header">
+      <h2 id="usersCount">Users</h2>
+      <div id="lastUpdated" class="muted"></div>
+    </div>
+    <div id="usersList" class="users-list"></div>
+  </div>
+  <script>
+    async function loadUsers(){
+      const listEl=document.getElementById('usersList');
+      try {
+        const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+        const resp = await fetch(base + 'users-master.json?_=' + Date.now());
+        if(!resp.ok) throw new Error('Status '+resp.status);
+        let users = [];
+        try { users = await resp.json(); } catch { users = []; }
+        if(!Array.isArray(users) || users.length===0){
+          listEl.innerHTML = '<div class="empty">No users have been created yet.</div>';
+          document.getElementById('usersCount').textContent='Users (0)';
+          return;
+        }
+        // Fetch each user's skills file to count L3 selections (optional optimization: parallel with Promise.all)
+        const rows=[];
+        for(const u of users){
+          let count='0';
+          if(u.skillsFile){
+            try {
+              const skillsResp = await fetch(base + u.skillsFile);
+              if(skillsResp.ok){
+                const data = await skillsResp.json();
+                // Count all level 3 nodes
+                let c=0; (data||[]).forEach(l1=> (l1.skills||[]).forEach(l2=> (l2.skills||[]).forEach(l3=> { if(l3.level===3) c++; })));
+                count = String(c);
+              }
+            } catch(_){}
+          }
+          rows.push(`<div class="user-row"><span class="user-email">${u.email}</span><span class="badge" title="Selected Skills">${count}</span></div>`);
+        }
+        listEl.innerHTML = rows.join('');
+        document.getElementById('usersCount').textContent='Users ('+users.length+')';
+        document.getElementById('lastUpdated').textContent='Updated '+ new Date().toLocaleString();
+      } catch (e){
+        listEl.innerHTML = '<div class="empty">Failed to load users.</div>';
+        console.error('Failed to load users', e);
+      }
+    }
+    loadUsers();
+  </script>
+</body>
+</html>
