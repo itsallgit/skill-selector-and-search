@@ -400,6 +400,14 @@ deploy_files() {
         --content-type "application/json" \
         --profile $AWS_PROFILE
     
+    aws s3 cp skill-levels-mapping.json s3://$BUCKET_NAME/skill-levels-mapping.json \
+        --content-type "application/json" \
+        --profile $AWS_PROFILE
+    
+    aws s3 cp skill-ratings-mapping.json s3://$BUCKET_NAME/skill-ratings-mapping.json \
+        --content-type "application/json" \
+        --profile $AWS_PROFILE
+    
     aws s3 cp users-master.json s3://$BUCKET_NAME/users-master.json \
         --content-type "application/json" \
         --profile $AWS_PROFILE
@@ -463,6 +471,7 @@ main() {
         aws s3 cp app.js s3://$BUCKET_NAME/app.js --content-type "application/javascript" --profile "$AWS_PROFILE"
         aws s3 cp skills-master.json s3://$BUCKET_NAME/skills-master.json --content-type "application/json" --profile "$AWS_PROFILE"
         aws s3 cp skill-levels-mapping.json s3://$BUCKET_NAME/skill-levels-mapping.json --content-type "application/json" --profile "$AWS_PROFILE" || true
+        aws s3 cp skill-ratings-mapping.json s3://$BUCKET_NAME/skill-ratings-mapping.json --content-type "application/json" --profile "$AWS_PROFILE" || true
         aws s3 cp users.html s3://$BUCKET_NAME/users.html --content-type "text/html" --profile "$AWS_PROFILE" || true
         print_success "Files deployed (users-master.json and /users directory preserved)"
     else

@@ -566,9 +566,8 @@ html { scroll-behavior: smooth; }
 .l4-technologies-section {
     margin-top: auto;
     padding-top: 1rem;
-    border-top: 1px solid #e5e5e5;
     display: flex;
-    justify-content: center;
+    justify-content: left;
     flex-shrink: 0;
 }
 
@@ -578,6 +577,7 @@ html { scroll-behavior: smooth; }
     justify-content: center;
     gap: 0.5rem;
     padding: 0.625rem 1.25rem;
+    margin-bottom: 0.75rem; /* Add bottom padding so it's not touching rating section */
     background: #79c03f;
     color: white;
     border: none;
@@ -586,6 +586,7 @@ html { scroll-behavior: smooth; }
     font-size: 0.875rem;
     font-weight: 600;
     transition: all 0.2s ease;
+    line-height: 1;
 }
 
 .l4-select-btn:hover {
@@ -599,7 +600,7 @@ html { scroll-behavior: smooth; }
 }
 
 .l4-btn-icon {
-    font-size: 1rem;
+    font-size: 1.5rem;
 }
 
 /* Level 4 Technology Modal */
@@ -761,7 +762,14 @@ html { scroll-behavior: smooth; }
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;
-    margin-top: 0.5rem;
+}
+
+/* Technology Tags in Explorer Cards */
+.skill-technologies-explorer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.75rem;
 }
 
 .tech-tag {
@@ -786,18 +794,30 @@ html { scroll-behavior: smooth; }
     flex-direction: column;
     align-items: flex-start;
     position: relative;
-    padding-right: 2.5rem;
 }
 
-.selected-skill-item .skill-leaf-title {
-    flex: 1;
+.skill-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     width: 100%;
 }
 
+.selected-skill-item .skill-leaf-title {
+    flex: 1; /* Allow to grow and shrink */
+    min-width: 0; /* Allow text to wrap */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.skill-rating-container {
+    flex: 0 0 auto; /* Fixed width, no grow/shrink */
+}
+
 .selected-skill-item .remove-skill-btn {
-    position: absolute;
     top: 0.5rem;
     right: 0.5rem;
+    flex: 0 0 auto;
 }
 
 /* Responsive Modal */
@@ -814,5 +834,100 @@ html { scroll-behavior: smooth; }
     
     .l4-modal-overlay {
         padding: 0;
+    }
+}
+
+/* Rating Dropdown Styles */
+.l3-rating-section {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.rating-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.l3-rating-dropdown,
+.skill-rating-dropdown {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid #e5e5e5;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg width="12" height="8" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M1 1l5 5 5-5" stroke="%23333" stroke-width="2" fill="none" fill-rule="evenodd"/%3E%3C/svg%3E');
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px;
+    padding-right: 2.5rem;
+}
+
+.l3-rating-dropdown:hover,
+.skill-rating-dropdown:hover {
+    border-color: #79c03f;
+}
+
+.l3-rating-dropdown:focus,
+.skill-rating-dropdown:focus {
+    outline: none;
+    border-color: #79c03f;
+    box-shadow: 0 0 0 3px rgba(121, 192, 63, 0.1);
+}
+
+/* Pulse animation for new ratings */
+.l3-rating-dropdown.rating-pulse {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% {
+        border-color: #e5e5e5;
+        box-shadow: 0 0 0 0 rgba(121, 192, 63, 0);
+    }
+    50% {
+        border-color: #79c03f;
+        box-shadow: 0 0 0 4px rgba(121, 192, 63, 0.2);
+    }
+}
+
+/* Save button with changes indicator */
+.btn-success.has-changes {
+    background-color: #ff8c00; /* Orange color */
+    animation: buttonPulse 1.5s ease-in-out infinite;
+}
+
+.btn-success.has-changes:hover {
+    background-color: #e67e00; /* Darker orange on hover */
+}
+
+@keyframes buttonPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(255, 140, 0, 0);
+    }
+}
+
+/* Responsive rating adjustments */
+@media (max-width: 600px) {
+    .l3-rating-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .rating-label {
+        font-size: 0.8rem;
     }
 }

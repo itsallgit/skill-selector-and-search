@@ -27,6 +27,7 @@ class SkillsApp {
             s3BaseUrl: window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/'),
             masterSkillsFile: 'skills-master.json',
             skillLevelsMappingFile: 'skill-levels-mapping.json',
+            skillRatingsMappingFile: 'skill-ratings-mapping.json',
             usersFile: 'users-master.json',
             maxRetries: 3,
             retryDelay: 1000
@@ -37,9 +38,11 @@ class SkillsApp {
             currentUser: null,
             masterSkills: null,
             skillLevelsMapping: null,
+            skillRatingsMapping: null,
             skillLookup: null,
             selectedSkills: new Map(),
             missingSkills: [],
+            hasUnsavedChanges: false,
             currentL1: null,
             currentL2: null,
             currentL3: null,
@@ -60,6 +63,7 @@ class SkillsApp {
             this.initializeElements();
             this.attachEventListeners();
             await this.loadSkillLevelsMapping();
+            await this.loadSkillRatingsMapping();
             await this.loadMasterSkills();
             console.log('Skills Selector Application initialized successfully');
         } catch (error) {
@@ -158,6 +162,36 @@ class SkillsApp {
     }
 
     /**
+     * Load skill ratings mapping
+     */
+    async loadSkillRatingsMapping() {
+        try {
+            this.setLoading(true);
+            const response = await this.fetchWithRetry(this.config.skillRatingsMappingFile);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load skill ratings mapping: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.state.skillRatingsMapping = data.ratings;
+            
+            console.log('Skill ratings mapping loaded successfully');
+        } catch (error) {
+            console.error('Error loading skill ratings mapping:', error);
+            this.showError('Failed to load skill ratings. Using default ratings.');
+            // Fallback to default mapping
+            this.state.skillRatingsMapping = [
+                { value: 1, name: "Beginner", description: "Learning the fundamentals", color: "#E3F2FD" },
+                { value: 2, name: "Intermediate", description: "Comfortable with core concepts", color: "#64B5F6" },
+                { value: 3, name: "Advanced", description: "Deep expertise and mastery", color: "#1976D2" }
+            ];
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    /**
      * Get skill name for a given level
      */
     getSkillLevelName(level) {
@@ -166,6 +200,28 @@ class SkillsApp {
         }
         const mapping = this.state.skillLevelsMapping.find(m => m.level === level);
         return mapping ? mapping.name : `Level ${level}`;
+    }
+
+    /**
+     * Get rating info by value
+     */
+    getRatingInfo(value) {
+        if (!this.state.skillRatingsMapping) {
+            return { value: 1, name: "Beginner", description: "", color: "#E3F2FD" };
+        }
+        const rating = this.state.skillRatingsMapping.find(r => r.value === value);
+        return rating || this.state.skillRatingsMapping[0];
+    }
+
+    /**
+     * Get all available ratings
+     */
+    getAllRatings() {
+        return this.state.skillRatingsMapping || [
+            { value: 1, name: "Beginner", description: "Learning the fundamentals", color: "#E3F2FD" },
+            { value: 2, name: "Intermediate", description: "Comfortable with core concepts", color: "#64B5F6" },
+            { value: 3, name: "Advanced", description: "Deep expertise and mastery", color: "#1976D2" }
+        ];
     }
 
     /**
@@ -305,19 +361,24 @@ class SkillsApp {
             this.setLoading(true);
             this.clearEmailError();
             
+            console.log('[LOAD] Starting email submission for:', email);
             const user = await this.loadOrCreateUser(email);
             this.state.currentUser = user;
+            console.log('[LOAD] User loaded:', { email: user.email, hasSkillsFile: !!user.skillsFile, skillsFile: user.skillsFile });
             
             // Load existing skills if user has them
             if (user.skillsFile) {
+                console.log('[LOAD] User has existing skills file, attempting to load:', user.skillsFile);
                 await this.loadUserSkills(user.skillsFile);
+            } else {
+                console.log('[LOAD] No existing skills file for this user');
             }
             
             this.showSkillsSection();
             this.renderLevel1Skills();
             
         } catch (error) {
-            console.error('Error handling email submission:', error);
+            console.error('[LOAD ERROR] Error handling email submission:', error);
             this.showEmailError('Failed to load user profile. Please try again.');
         } finally {
             this.setLoading(false);
@@ -337,12 +398,15 @@ class SkillsApp {
      */
     async loadOrCreateUser(email) {
         try {
+            console.log('[USER] Loading users list...');
             const users = await this.loadUsersList();
+            console.log('[USER] Users list loaded, total users:', users.length);
 
             // Attempt to find existing user
             let user = users.find(u => u.email === email);
 
             if (!user) {
+                console.log('[USER] New user - creating profile for:', email);
                 user = {
                     email,
                     skillsFile: null,
@@ -354,7 +418,7 @@ class SkillsApp {
                     await this.saveFile(this.config.usersFile, users);
                     this.showToast('New profile created successfully!', 'success');
                 } catch (saveErr) {
-                    console.warn('Could not persist new user list (continuing in memory only):', saveErr);
+                    console.warn('[USER] Could not persist new user list (continuing in memory only):', saveErr);
                     this.showToast('Profile created in session (storage unavailable).', 'warning');
                     // Fallback: store minimal info in localStorage so refresh can rehydrate (best-effort only)
                     try {
@@ -365,11 +429,12 @@ class SkillsApp {
                     } catch (_) { /* ignore localStorage issues */ }
                 }
             } else {
+                console.log('[USER] Existing user found:', { email: user.email, skillsFile: user.skillsFile, createdAt: user.createdAt });
                 this.showToast('Welcome back!', 'success');
             }
             return user;
         } catch (error) {
-            console.error('Error loading/creating user (non-fatal for new session):', error);
+            console.error('[USER ERROR] Error loading/creating user (non-fatal for new session):', error);
             // As a last resort, allow a transient in-memory user so UI continues
             const fallbackUser = { email, skillsFile: null, createdAt: new Date().toISOString(), transient: true };
             this.showToast('Running in temporary mode (data not persisted).', 'warning');
@@ -415,13 +480,27 @@ class SkillsApp {
      */
     async loadUserSkills(skillsFile) {
         try {
+            console.log('[SKILLS] Attempting to load skills from:', skillsFile);
             const response = await this.fetchWithRetry(skillsFile);
             
             if (response.ok) {
                 const data = await response.json();
+                console.log('[SKILLS] Skills file loaded successfully:', { 
+                    hasSelectedSkills: !!data.selectedSkills, 
+                    isArray: Array.isArray(data.selectedSkills || data),
+                    skillCount: (data.selectedSkills || data).length,
+                    lastUpdated: data.lastUpdated 
+                });
+                
                 // Handle both old format (array) and new format (object with selectedSkills)
                 const userSkills = data.selectedSkills || data;
                 this.loadSelectedSkillsFromData(userSkills);
+                
+                // Reset unsaved changes flag after loading
+                this.state.hasUnsavedChanges = false;
+                this.updateSaveButtonState();
+                
+                console.log('[SKILLS] Skills loaded into state, selectedSkills.size:', this.state.selectedSkills.size);
                 
                 // Show missing skills banner if any skills couldn't be resolved
                 this.showMissingSkillsBanner();
@@ -433,9 +512,11 @@ class SkillsApp {
                 } else {
                     this.showToast('Your existing skills have been loaded', 'success');
                 }
+            } else {
+                console.warn('[SKILLS] Failed to load skills file, status:', response.status, response.statusText);
             }
         } catch (error) {
-            console.error('Error loading user skills:', error);
+            console.error('[SKILLS ERROR] Error loading user skills:', error);
             this.showToast('Could not load existing skills', 'warning');
         }
     }
@@ -444,21 +525,31 @@ class SkillsApp {
      * Load selected skills from saved data
      */
     loadSelectedSkillsFromData(userSkills) {
+        console.log('[PARSE] Starting to parse skills data:', { 
+            isArray: Array.isArray(userSkills), 
+            length: userSkills?.length,
+            firstItem: userSkills?.[0] 
+        });
+        
         this.state.selectedSkills.clear();
         this.state.missingSkills = [];
         
         if (!Array.isArray(userSkills) || userSkills.length === 0) {
+            console.log('[PARSE] No skills to load (empty or invalid array)');
             this.updateSelectedSkillsDisplay();
             return;
         }
         
         // Check if this is the new flat format or old hierarchical format
         const isNewFormat = userSkills[0].hasOwnProperty('l1Id');
+        console.log('[PARSE] Format detected:', isNewFormat ? 'NEW (flat with IDs)' : 'OLD (hierarchical)');
         
         if (isNewFormat) {
+            console.log('[PARSE] Processing new format skills...');
             // New flat format with only IDs
-            userSkills.forEach(selection => {
+            userSkills.forEach((selection, index) => {
                 const { l1Id, l2Id, l3Id, l4Ids } = selection;
+                console.log(`[PARSE] Processing skill ${index + 1}/${userSkills.length}:`, { l1Id, l2Id, l3Id, l4Count: l4Ids?.length, rating: selection.rating });
                 
                 // Resolve skills from master using lookup index
                 const l1Data = this.resolveSkillById(l1Id);
@@ -468,19 +559,21 @@ class SkillsApp {
                 // Check for missing skills
                 if (!l1Data) {
                     this.state.missingSkills.push({ id: l1Id, level: 1 });
-                    console.warn(`L1 skill not found: ${l1Id}`);
+                    console.warn('[PARSE] L1 skill not found:', l1Id);
                     return;
                 }
                 if (!l2Data) {
                     this.state.missingSkills.push({ id: l2Id, level: 2 });
-                    console.warn(`L2 skill not found: ${l2Id}`);
+                    console.warn('[PARSE] L2 skill not found:', l2Id);
                     return;
                 }
                 if (!l3Data) {
                     this.state.missingSkills.push({ id: l3Id, level: 3 });
-                    console.warn(`L3 skill not found: ${l3Id}`);
+                    console.warn('[PARSE] L3 skill not found:', l3Id);
                     return;
                 }
+                
+                console.log(`[PARSE] Resolved skill: ${l1Data.skill.title} > ${l2Data.skill.title} > ${l3Data.skill.title}`);
                 
                 // Resolve L4 skills
                 const l4Skills = [];
@@ -495,13 +588,15 @@ class SkillsApp {
                             });
                         } else {
                             this.state.missingSkills.push({ id: l4Id, level: 4 });
-                            console.warn(`L4 skill not found: ${l4Id}`);
+                            console.warn('[PARSE] L4 skill not found:', l4Id);
                         }
                     });
                 }
                 
                 // Build selection key and store
                 const key = this.buildSelectionKey(l1Id, l2Id, l3Id);
+                console.log(`[PARSE] Storing skill with key: ${key}, rating: ${selection.rating || 1}`);
+                
                 this.state.selectedSkills.set(key, {
                     key,
                     l1: { 
@@ -519,12 +614,15 @@ class SkillsApp {
                         title: l3Data.skill.title, 
                         description: l3Data.skill.description 
                     },
-                    l4Skills: l4Skills
+                    l4Skills: l4Skills,
+                    rating: selection.rating || 1,  // Load rating or default to Beginner
+                    _ratingAcknowledged: true  // Don't pulse for loaded skills
                 });
             });
+            console.log('[PARSE] Finished processing new format. Total skills loaded:', this.state.selectedSkills.size);
         } else {
             // Old hierarchical format with titles/descriptions - convert and warn
-            console.warn('Loading old skill format - this will be converted to new format on next save');
+            console.warn('[PARSE] Loading old skill format - this will be converted to new format on next save');
             userSkills.forEach(l1 => {
                 if (!Array.isArray(l1.skills)) return;
                 l1.skills.forEach(l2 => {
@@ -547,7 +645,9 @@ class SkillsApp {
                                 l1: { id: l1.id, title: l1.title, description: l1.description },
                                 l2: { id: l2.id, title: l2.title, description: l2.description },
                                 l3: { id: l3.id, title: l3.title, description: l3.description },
-                                l4Skills: l4Skills
+                                l4Skills: l4Skills,
+                                rating: 1,  // Default rating for old format
+                                _ratingAcknowledged: true  // Don't pulse for loaded skills
                             });
                         }
                     });
@@ -557,10 +657,13 @@ class SkillsApp {
         
         // Show missing skills banner if any
         if (this.state.missingSkills.length > 0) {
+            console.log('[PARSE] Missing skills detected:', this.state.missingSkills.length);
             this.showMissingSkillsBanner();
         }
         
+        console.log('[PARSE] Calling updateSelectedSkillsDisplay()...');
         this.updateSelectedSkillsDisplay();
+        console.log('[PARSE] Complete! Final selectedSkills.size:', this.state.selectedSkills.size);
     }
 
     /**
@@ -671,6 +774,59 @@ class SkillsApp {
         const selectedClass = isSelected ? 'selected' : '';
         const selectedIndicator = isSelected ? '<span class="selected-indicator">Selected</span>' : '';
         
+        // Get current rating for this skill (if selected)
+        const skillData = this.state.selectedSkills.get(key);
+        const currentRating = skillData?.rating || (isSelected ? 1 : null);
+        
+        // Build rating dropdown HTML
+        let ratingDropdown = '';
+        if (isSelected) {
+            // Selected skill: show dropdown with current rating
+            const ratingInfo = this.getRatingInfo(currentRating);
+            const allRatings = this.getAllRatings();
+            const ratingOptions = allRatings.map(r => 
+                `<option value="${r.value}" ${r.value === currentRating ? 'selected' : ''}>${r.name}</option>`
+            ).join('');
+            
+            // Add pulse class if newly selected with default rating and not acknowledged
+            const pulseClass = (currentRating === 1 && !skillData?._ratingAcknowledged) ? 'rating-pulse' : '';
+            
+            // Text color for dropdown (white for Advanced)
+            const textColor = currentRating === 3 ? '#fff' : '#333';
+            
+            ratingDropdown = `
+                <div class="l3-rating-section">
+                    <label class="rating-label">Rating:</label>
+                    <select class="l3-rating-dropdown ${pulseClass}" data-skill-key="${key}" style="background-color: ${ratingInfo.color}; color: ${textColor}">
+                        ${ratingOptions}
+                    </select>
+                </div>
+            `;
+        } else {
+            // Unselected skill: show placeholder dropdown (disabled)
+            ratingDropdown = `
+                <div class="l3-rating-section">
+                    <label class="rating-label">Rating:</label>
+                    <select class="l3-rating-dropdown" data-skill-key="${key}" disabled style="background-color: #f5f5f5; color: #999;">
+                        <option value="">Select from dropdown...</option>
+                    </select>
+                </div>
+            `;
+        }
+        
+        // Show technologies if selected and has L4 skills
+        let technologiesDisplay = '';
+        if (isSelected && skillData?.l4Skills && skillData.l4Skills.length > 0) {
+            const techTags = skillData.l4Skills.map(l4 => 
+                `<span class="tech-tag">${l4.title}</span>`
+            ).join('');
+            technologiesDisplay = `
+                <div class="skill-technologies-explorer">
+                    ${techTags}
+                </div>
+            `;
+        }
+        
         let l4Button = '';
         if (hasL4Skills) {
             const l4Name = this.getSkillLevelName(4);
@@ -692,7 +848,9 @@ class SkillsApp {
                 ${selectedIndicator}
                 <div class="skill-card-title">${skill.title}</div>
                 <div class="skill-card-description">${skill.description}</div>
+                ${technologiesDisplay}
                 ${l4Button}
+                ${ratingDropdown}
             </div>`;
     }
 
@@ -700,10 +858,10 @@ class SkillsApp {
      * Attach event listeners for Level 3 cards and Level 4 buttons
      */
     attachLevel3EventListeners() {
-        // Toggle L3 selection when clicking the card (but not the button area)
+        // Toggle L3 selection when clicking the card (but not the button/dropdown area)
         this.elements.level3Skills.onclick = (e) => {
-            // Ignore clicks on technology button
-            if (e.target.closest('.l4-technologies-section')) {
+            // Ignore clicks on technology button or rating dropdown
+            if (e.target.closest('.l4-technologies-section') || e.target.closest('.l3-rating-section')) {
                 return;
             }
             const card = e.target.closest('.skill-card');
@@ -720,6 +878,39 @@ class SkillsApp {
                 const l3Key = button.dataset.l3Key;
                 const l3Title = button.dataset.l3Title;
                 this.showL4TechnologyModal(l3Key, l3Title);
+            });
+        });
+        
+        // Handle rating dropdown changes
+        const ratingDropdowns = this.elements.level3Skills.querySelectorAll('.l3-rating-dropdown');
+        ratingDropdowns.forEach(dropdown => {
+            dropdown.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const skillKey = dropdown.dataset.skillKey;
+                const newRating = parseInt(dropdown.value);
+                const skillData = this.state.selectedSkills.get(skillKey);
+                
+                if (skillData) {
+                    skillData.rating = newRating;
+                    skillData._ratingAcknowledged = true; // Stop pulsing
+                    this.state.hasUnsavedChanges = true;
+                    
+                    // Update dropdown color and text color
+                    const ratingInfo = this.getRatingInfo(newRating);
+                    dropdown.style.backgroundColor = ratingInfo.color;
+                    dropdown.style.color = newRating === 3 ? '#fff' : '#333'; // White text for Advanced
+                    
+                    // Remove pulse animation from dropdown only
+                    dropdown.classList.remove('rating-pulse');
+                    
+                    // Sync: Update selected skills display to reflect rating change
+                    this.updateSelectedSkillsDisplay();
+                    
+                    // Visual indicator on save button
+                    this.updateSaveButtonState();
+                    
+                    this.showToast(`Rating updated to ${ratingInfo.name}`, 'success');
+                }
             });
         });
     }
@@ -844,7 +1035,8 @@ class SkillsApp {
                 l1: { id: l1Id, title: l1Skill.title, description: l1Skill.description },
                 l2: { id: l2Id, title: l2Skill.title, description: l2Skill.description },
                 l3: { id: l3Id, title: l3Skill.title, description: l3Skill.description },
-                l4Skills: selectedTechnologies
+                l4Skills: selectedTechnologies,
+                rating: 1  // Default to Beginner
             });
             this.showToast(`${selectedTechnologies.length} ${this.getSkillLevelName(4).toLowerCase()} selected`, 'success');
         } else {
@@ -929,7 +1121,8 @@ class SkillsApp {
                 l1: { id: l1Id, title: l1Skill.title, description: l1Skill.description },
                 l2: { id: l2Id, title: l2Skill.title, description: l2Skill.description },
                 l3: { id: l3Id, title: l3Skill.title, description: l3Skill.description },
-                l4Skills: []
+                l4Skills: [],
+                rating: 1  // Default to Beginner
             });
             this.showToast('Skill added', 'success');
         }
@@ -958,9 +1151,11 @@ class SkillsApp {
      * Update selected skills display
      */
     updateSelectedSkillsDisplay() {
+        console.log('[DISPLAY] updateSelectedSkillsDisplay called, selectedSkills.size:', this.state.selectedSkills.size);
         const container = this.elements.selectedSkillsDisplay;
         
         if (this.state.selectedSkills.size === 0) {
+            console.log('[DISPLAY] No skills selected, showing empty message');
             container.innerHTML = '<p class="empty-message">Please select your skills</p>';
             this.elements.saveSkillsBtn.style.display = 'none';
             const viewBtn = document.getElementById('viewSelectedBtn');
@@ -968,29 +1163,35 @@ class SkillsApp {
             return;
         }
 
+        console.log('[DISPLAY] Grouping skills for display...');
+
         // Group by L1 -> L2 -> list of L3 (with L4)
         const grouped = {};
-        for (const { l1, l2, l3, l4Skills, key } of this.state.selectedSkills.values()) {
+        for (const { l1, l2, l3, l4Skills, key, rating, _ratingAcknowledged } of this.state.selectedSkills.values()) {
             if (!grouped[l1.id]) grouped[l1.id] = { meta: l1, children: {} };
             if (!grouped[l1.id].children[l2.id]) grouped[l1.id].children[l2.id] = { meta: l2, items: [] };
-            grouped[l1.id].children[l2.id].items.push({ l3, l4Skills: l4Skills || [], key });
+            grouped[l1.id].children[l2.id].items.push({ l3, l4Skills: l4Skills || [], key, rating, _ratingAcknowledged });
         }
         const htmlParts = [];
         Object.values(grouped).forEach(l1Group => {
             htmlParts.push(`<div class="selected-group"><div class="selected-group-title">${l1Group.meta.title}</div>`);
             Object.values(l1Group.children).forEach(l2Group => {
                 htmlParts.push(`<div class="selected-subgroup-title">${l2Group.meta.title}</div>`);
-                l2Group.items.forEach(({ l3, l4Skills, key }) => {
-                    htmlParts.push(this.createSelectedSkillItem(key, { l1: l1Group.meta, l2: l2Group.meta, l3, l4Skills }));
+                l2Group.items.forEach(({ l3, l4Skills, key, rating, _ratingAcknowledged }) => {
+                    htmlParts.push(this.createSelectedSkillItem(key, { l1: l1Group.meta, l2: l2Group.meta, l3, l4Skills, rating, _ratingAcknowledged }));
                 });
             });
             htmlParts.push('</div>');
         });
         container.innerHTML = htmlParts.join('');
+        console.log('[DISPLAY] HTML generated, skill items:', htmlParts.length);
+        
         this.elements.saveSkillsBtn.style.display = 'block';
         const viewBtn = document.getElementById('viewSelectedBtn');
         if (viewBtn) viewBtn.style.display = 'inline-block';
 
+        console.log('[DISPLAY] Display updated successfully');
+        
         // Ensure download button visibility if any selections
     // Download button removed
 
@@ -1008,6 +1209,49 @@ class SkillsApp {
                 this.showToast('Skill removed', 'success');
             }
         };
+        
+        // Handle rating changes
+        container.onchange = (e) => {
+            if (e.target.classList.contains('skill-rating-dropdown')) {
+                const skillKey = e.target.dataset.skillId;
+                const newRating = parseInt(e.target.value);
+                const skillData = this.state.selectedSkills.get(skillKey);
+                if (skillData) {
+                    skillData.rating = newRating;
+                    skillData._ratingAcknowledged = true;
+                    this.state.hasUnsavedChanges = true;
+                    
+                    // Update dropdown color and text color
+                    const ratingInfo = this.getRatingInfo(newRating);
+                    e.target.style.backgroundColor = ratingInfo.color;
+                    e.target.style.color = newRating === 3 ? '#fff' : '#333'; // White text for Advanced
+                    
+                    // Sync: Re-render explorer section if visible to update rating dropdown there
+                    if (this.state.currentL2) {
+                        const l1Skill = this.state.masterSkills.find(s => s.id === this.state.currentL1);
+                        const l2Skill = l1Skill ? l1Skill.skills.find(s => s.id === this.state.currentL2) : null;
+                        if (l2Skill) this.renderLevel3Skills(l2Skill.skills);
+                    }
+                    
+                    // Visual indicator on save button
+                    this.updateSaveButtonState();
+                    this.showToast(`Rating updated to ${ratingInfo.name}`, 'success');
+                }
+            }
+        };
+    }
+
+    /**
+     * Update save button visual state based on unsaved changes
+     */
+    updateSaveButtonState() {
+        if (this.state.hasUnsavedChanges) {
+            this.elements.saveSkillsBtn.classList.add('has-changes');
+            this.elements.saveSkillsBtn.textContent = 'Save Changes *';
+        } else {
+            this.elements.saveSkillsBtn.classList.remove('has-changes');
+            this.elements.saveSkillsBtn.textContent = 'Save Skills';
+        }
     }
 
     /** Count selected L3 under given hierarchy */
@@ -1030,11 +1274,28 @@ class SkillsApp {
             ? `<div class="skill-technologies">${skillData.l4Skills.map(l4 => `<span class="tech-tag">${l4.title}</span>`).join('')}</div>`
             : '';
         
+        const currentRating = skillData.rating || 1;
+        const ratingInfo = this.getRatingInfo(currentRating);
+        const allRatings = this.getAllRatings();
+        const ratingOptions = allRatings.map(r => 
+            `<option value="${r.value}" ${r.value === currentRating ? 'selected' : ''}>${r.name}</option>`
+        ).join('');
+        
+        // Text color for dropdown (white for Advanced)
+        const textColor = currentRating === 3 ? '#fff' : '#333';
+        
         return `
             <div class="selected-skill-item">
-                <div class="skill-leaf-title">${skillData.l3.title}</div>
+                <div class="skill-item-header">
+                    <div class="skill-leaf-title">${skillData.l3.title}</div>
+                    <div class="skill-rating-container">
+                        <select class="skill-rating-dropdown" data-skill-id="${id}" style="background-color: ${ratingInfo.color}; color: ${textColor}">
+                            ${ratingOptions}
+                        </select>
+                    </div>
+                    <button class="remove-skill-btn" data-skill-id="${id}" aria-label="Remove skill ${skillData.l3.title}">×</button>
+                </div>
                 ${l4TechnologiesHtml}
-                <button class="remove-skill-btn" data-skill-id="${id}" aria-label="Remove skill ${skillData.l3.title}">×</button>
             </div>`;
     }
 
@@ -1050,14 +1311,19 @@ class SkillsApp {
         try {
             this.setLoading(true);
             
+            console.log('[SAVE-SKILLS] Starting save process for user:', this.state.currentUser.email);
+            console.log('[SAVE-SKILLS] Selected skills count:', this.state.selectedSkills.size);
+            
             // Create hierarchical structure for selected skills
             const userSkillsData = this.createUserSkillsStructure();
+            console.log('[SAVE-SKILLS] Skills data structure created, items:', userSkillsData.length);
             
             // Generate filename with email only (format: <email>.json inside users/ folder)
             // Sanitize email for filename (replace special characters)
             const emailPart = this.state.currentUser.email.replace(/[^a-zA-Z0-9@.-]/g, '_');
             const filenameOnly = `${emailPart}.json`;
             const objectKey = `users/${filenameOnly}`;
+            console.log('[SAVE-SKILLS] Target file path:', objectKey);
             
             // Add timestamp inside the JSON data
             const dataWithTimestamp = {
@@ -1067,16 +1333,25 @@ class SkillsApp {
             };
             
             // Save skills file (will overwrite existing file)
+            console.log('[SAVE-SKILLS] Step 1: Saving skills file...');
             await this.saveFile(objectKey, dataWithTimestamp);
+            console.log('[SAVE-SKILLS] Skills file saved successfully');
             
             // Update user record with skills file reference
+            console.log('[SAVE-SKILLS] Step 2: Updating users-master.json...');
             await this.updateUserSkillsFile(objectKey);
+            console.log('[SAVE-SKILLS] users-master.json updated successfully');
             
+            // Reset unsaved changes flag
+            this.state.hasUnsavedChanges = false;
+            this.updateSaveButtonState();
+            
+            console.log('[SAVE-SKILLS] Save process completed successfully!');
             this.showToast('Skills saved successfully!', 'success');
             // Download button removed
             
         } catch (error) {
-            console.error('Error saving skills:', error);
+            console.error('[SAVE-SKILLS ERROR] Error saving skills:', error);
             this.showToast('Failed to save skills. Please try again.', 'error');
         } finally {
             this.setLoading(false);
@@ -1099,7 +1374,8 @@ class SkillsApp {
                 l1Id: skillData.l1.id,
                 l2Id: skillData.l2.id,
                 l3Id: skillData.l3.id,
-                l4Ids: (skillData.l4Skills || []).map(l4 => l4.id)
+                l4Ids: (skillData.l4Skills || []).map(l4 => l4.id),
+                rating: skillData.rating || 1  // Include rating in saved data
             };
             flatStructure.push(selection);
         }
@@ -1112,27 +1388,46 @@ class SkillsApp {
      */
     async updateUserSkillsFile(filename) {
         try {
+            console.log('[UPDATE] Starting updateUserSkillsFile with filename:', filename);
+            console.log('[UPDATE] Current user email:', this.state.currentUser.email);
+            
             // Load current users list
             const response = await this.fetchWithRetry(this.config.usersFile);
             let users = [];
             if (response && response.ok) {
-                try { users = await response.json(); } catch (_) { users = []; }
+                try { 
+                    users = await response.json(); 
+                    console.log('[UPDATE] Loaded users-master.json, total users:', users.length);
+                } catch (_) { 
+                    console.warn('[UPDATE] Failed to parse users-master.json');
+                    users = []; 
+                }
+            } else {
+                console.warn('[UPDATE] Failed to fetch users-master.json, status:', response?.status);
             }
 
             // Ensure current user exists in list
             let user = users.find(u => u.email === this.state.currentUser.email);
             if (!user) {
+                console.log('[UPDATE] User not found in list, creating new entry');
                 user = { email: this.state.currentUser.email, createdAt: new Date().toISOString(), skillsFile: null };
                 users.push(user);
+            } else {
+                console.log('[UPDATE] User found in list, current skillsFile:', user.skillsFile);
             }
 
             user.skillsFile = filename;
             user.lastUpdated = new Date().toISOString();
+            console.log('[UPDATE] Updated user object:', { email: user.email, skillsFile: user.skillsFile, lastUpdated: user.lastUpdated });
 
+            console.log('[UPDATE] Attempting to save users-master.json...');
             await this.saveFile(this.config.usersFile, users);
+            console.log('[UPDATE] users-master.json saved successfully');
+            
             this.state.currentUser.skillsFile = filename;
+            console.log('[UPDATE] State updated, currentUser.skillsFile:', this.state.currentUser.skillsFile);
         } catch (error) {
-            console.error('Error updating user skills file reference:', error);
+            console.error('[UPDATE ERROR] Error updating user skills file reference:', error);
             throw error;
         }
     }
@@ -1141,6 +1436,9 @@ class SkillsApp {
      * Save file to S3 using PUT request
      */
     async saveFile(filename, data) {
+        console.log('[SAVE] Starting saveFile for:', filename);
+        console.log('[SAVE] Data type:', Array.isArray(data) ? 'Array' : typeof data, 'Length/Keys:', Array.isArray(data) ? data.length : Object.keys(data).length);
+        
         // For WRITE operations we must use the REST endpoint (website endpoints do NOT support PUT)
         // Special-case us-east-1 endpoint style
     // Prefer explicit placeholders substituted by deploy script; if unchanged use inferred values
@@ -1152,6 +1450,9 @@ class SkillsApp {
             : `https://${bucketName}.s3.${region}.amazonaws.com/`;
         const url = restBase + filename;
 
+        console.log('[SAVE] Target URL:', url);
+        console.log('[SAVE] Bucket:', bucketName, 'Region:', region);
+        
         const response = await fetch(url, {
             method: 'PUT',
             headers: {
@@ -1160,9 +1461,11 @@ class SkillsApp {
             body: JSON.stringify(data, null, 2)
         });
         
+        console.log('[SAVE] Response status:', response.status, response.statusText);
+        
         if (!response.ok) {
             // Provide clearer diagnostics for common static hosting issues
-            console.error('Save failure details', {
+            console.error('[SAVE ERROR] Save failure details', {
                 status: response.status,
                 statusText: response.statusText,
                 attemptedUrl: url,
@@ -1171,6 +1474,7 @@ class SkillsApp {
             throw new Error(`Failed to save file ${filename}: ${response.status} ${response.statusText}`);
         }
         
+        console.log('[SAVE] File saved successfully:', filename);
         return response;
     }
 

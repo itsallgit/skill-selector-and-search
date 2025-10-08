@@ -1,0 +1,22 @@
+{
+  "ratings": [
+    {
+      "value": 1,
+      "name": "Beginner",
+      "description": "Learning the fundamentals",
+      "color": "#E3F2FD"
+    },
+    {
+      "value": 2,
+      "name": "Intermediate",
+      "description": "Comfortable with core concepts",
+      "color": "#64B5F6"
+    },
+    {
+      "value": 3,
+      "name": "Advanced",
+      "description": "Deep expertise and mastery",
+      "color": "#1976D2"
+    }
+  ]
+}
