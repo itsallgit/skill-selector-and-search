@@ -19,9 +19,68 @@ A modern, responsive single-page application (SPA) for selecting and managing pr
 ## Application Structure
 
 ### Skill Hierarchy
-- **Level 1 (L01)**: Primary skill categories (e.g., Technology Consulting, Business Process Consulting)
-- **Level 2 (L02)**: Sub-categories within each primary area (e.g., Digital Strategy, Cloud Solutions)
-- **Level 3 (L03)**: Individual, selectable skills (e.g., Digital Transformation Planning, Cloud Migration Strategy)
+- **Level 1 (L1)**: Primary skill categories (e.g., Technology, Business Process Consulting)
+- **Level 2 (L2)**: Sub-categories within each primary area (e.g., Digital Strategy, Cloud Solutions)
+- **Level 3 (L3)**: Generic skills (e.g., Digital Transformation Planning, Cloud Migration Strategy)
+- **Level 4 (L4)**: Technologies (e.g., AWS, Azure, Python, TensorFlow)
+
+### Skill ID Generation Algorithm
+
+All skills in the system use **deterministic, collision-resistant IDs** that are:
+- **Case-insensitive** but stored in **UPPERCASE** for visual consistency
+- **Short and human-readable**: Format `L{level}{6-char-hash}` (e.g., `L1A3F2E9`)
+- **Unique**: Based on the full hierarchical path to prevent duplicates
+- **Reproducible**: Same skill path always generates the same ID
+
+#### Algorithm Details
+
+This has been included for future capabilities when skills can be added.
+
+```javascript
+/**
+ * Generate a deterministic skill ID
+ * Format: L{level}{6-char-hash}
+ * 
+ * @param {number} level - Skill level (1-4)
+ * @param {string} path - Full path (e.g., "Technology > Cloud Solutions > Multi-Cloud Architecture")
+ * @returns {string} - Unique ID like "L1A3F2E9"
+ */
+function generateSkillId(level, path) {
+    // 1. Create SHA-256 hash from the full skill path (case-insensitive)
+    const hash = crypto
+        .createHash('sha256')
+        .update(path.toLowerCase().trim())
+        .digest('hex');
+    
+    // 2. Convert first 6 bytes to uppercase alphanumeric characters
+    // Using charset: 0-9, A-Z (excluding I, O for clarity)
+    const chars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let shortHash = '';
+    
+    for (let i = 0; i < 6; i++) {
+        const byte = parseInt(hash.substr(i * 2, 2), 16);
+        shortHash += chars[byte % chars.length];
+    }
+    
+    // 3. Return formatted ID: L{level}{hash}
+    return `L${level}${shortHash}`;
+}
+```
+
+#### ID Examples
+- `L1VX34BJ` - Level 1: Technology
+- `L2B5980F` - Level 2: Technology > Cloud Solutions
+- `L387LN3G` - Level 3: Technology > Cloud Solutions > Multi-Cloud Architecture
+- `L4ALNXVK` - Level 4: Technology > Cloud Solutions > Multi-Cloud Architecture > Kubernetes
+
+#### Why This Algorithm?
+
+- **No Duplicates**: Hash-based approach ensures different paths get different IDs
+- **Stable**: Same skill path always produces the same ID (deterministic)
+- **Collision-Resistant**: SHA-256 provides excellent distribution
+- **Human-Readable**: Short alphanumeric format is easier to read than full UUIDs
+- **Hierarchical**: Level prefix provides quick visual identification
+- **Case-Insensitive**: Path is normalized before hashing for consistency
 
 ### File Structure
 ```
@@ -30,8 +89,10 @@ A modern, responsive single-page application (SPA) for selecting and managing pr
 ├── users.html              # Users listing (counts of selected skills)
 ├── styles.css              # Application styles (includes navbar, grouping, badges)
 ├── app.js                  # Core application logic
-├── skills-master.json      # Master skills hierarchical data
+├── skills-master.json      # Master skills hierarchical data (4 levels)
+├── skill-levels-mapping.json  # Maps level numbers to semantic names
 ├── users-master.json       # User registry (email, skillsFile pointer, timestamps)
+├── generate_skill_ids.js   # Script to regenerate skill IDs
 ├── deploy.sh               # AWS deployment automation
 └── README.md               # Documentation
 ```
@@ -119,33 +180,60 @@ After successful deployment, you'll receive:
 
 #### Updating Skills
 
-Edit `skills-master.json` to modify the skill database. The file uses a nested structure:
+Edit `skills-master.json` to modify the skill database. The file uses a nested array structure:
 
 ```json
-{
-  "L01S001": {
-    "title": "Category Name",
-    "description": "Category description",
-    "skills": {
-      "L02S001": {
-        "title": "Sub-category Name", 
-        "description": "Sub-category description",
-        "skills": {
-          "L03S001": {
-            "title": "Individual Skill",
-            "description": "Skill description"
+[
+  {
+    "id": "L1VX34BJ",
+    "level": 1,
+    "title": "Technology",
+    "description": "Expertise in technology strategy...",
+    "skills": [
+      {
+        "id": "L2B5980F",
+        "level": 2,
+        "title": "Cloud Solutions",
+        "description": "Cloud platform architecture...",
+        "skills": [
+          {
+            "id": "L387LN3G",
+            "level": 3,
+            "title": "Multi-Cloud Architecture",
+            "description": "Designing solutions across multiple clouds...",
+            "skills": [
+              {
+                "id": "L4ALNXVK",
+                "level": 4,
+                "title": "Kubernetes",
+                "description": "Container orchestration platform"
+              }
+            ]
           }
-        }
+        ]
       }
-    }
+    ]
   }
-}
+]
 ```
 
-**ID Conventions**:
-- L01S### for Level 1 skills
-- L02S### for Level 2 skills  
-- L03S### for Level 3 skills
+**Adding New Skills**:
+
+1. Determine the full hierarchical path for the new skill
+2. Generate the ID using the script:
+   ```bash
+   node generate_skill_ids.js
+   ```
+3. Add the skill object with the generated ID to the appropriate parent's `skills` array
+4. Include `id`, `level`, `title`, `description`, and optionally `skills` (for levels 1-3)
+
+**ID Format**: 
+- `L1{hash}` for Level 1 Capabilities
+- `L2{hash}` for Level 2 Capabilities
+- `L3{hash}` for Generic Skills
+- `L4{hash}` for Technologies
+
+See the **Skill ID Generation Algorithm** section above for details on how IDs are created.
 
 #### Re-deploying Changes
 
@@ -213,3 +301,11 @@ Edit `skills-master.json` to:
 - Add/remove skill categories
 - Modify descriptions
 - Reorganize hierarchy
+
+
+# TODO
+
+1. DONE - Only one user skills file per user
+2. Rename: L1 = L1 Capabilities, L2 = L2 Capabilities, L3 = Generic Skills, L4 = Technologies
+3. L3 ratings: Beginner, Intermediate, Advanced
+4. Ability to search users by skills

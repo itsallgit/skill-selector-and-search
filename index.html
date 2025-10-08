@@ -50,6 +50,22 @@
                     <h3>Welcome, <span id="userEmail"></span></h3>
                 </div>
 
+                <!-- Missing Skills Banner -->
+                <div id="missingSkillsBanner" class="missing-skills-banner" style="display: none;">
+                    <div class="banner-content">
+                        <div class="banner-icon">⚠️</div>
+                        <div class="banner-text">
+                            <strong>Some skills have been removed from the master list</strong>
+                            <p><span id="missingSkillsCount"></span> skill(s) from your previous selection are no longer available and have been removed. Last updated: <span id="lastUpdated"></span></p>
+                            <details>
+                                <summary>View missing skill IDs</summary>
+                                <div id="missingSkillsList" class="missing-skills-list"></div>
+                            </details>
+                        </div>
+                        <button id="dismissBannerBtn" class="banner-close" title="Dismiss">×</button>
+                    </div>
+                </div>
+
                 <!-- Selected Skills Display -->
                 <div class="selected-skills-container">
                     <h3>Selected Skills</h3>
@@ -67,19 +83,19 @@
                     
                     <!-- Level 1 Skills -->
                     <div class="skills-level">
-                        <h4>Primary Skill Areas</h4>
+                        <h4 id="level1Title">Level 1 Capabilities</h4>
                         <div id="level1Skills" class="skills-grid"></div>
                     </div>
 
                     <!-- Level 2 Skills -->
                     <div class="skills-level" id="level2Container" style="display: none;">
-                        <h4>Specialized Areas</h4>
+                        <h4 id="level2Title">Level 2 Capabilities</h4>
                         <div id="level2Skills" class="skills-grid"></div>
                     </div>
 
                     <!-- Level 3 Skills -->
                     <div class="skills-level" id="level3Container" style="display: none;">
-                        <h4>Specific Skills</h4>
+                        <h4 id="level3Title">Generic Skills</h4>
                         <div id="level3Skills" class="skills-grid"></div>
                     </div>
                     <div class="explorer-footer">

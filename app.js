@@ -26,6 +26,7 @@ class SkillsApp {
             inferredRegion,
             s3BaseUrl: window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/'),
             masterSkillsFile: 'skills-master.json',
+            skillLevelsMappingFile: 'skill-levels-mapping.json',
             usersFile: 'users-master.json',
             maxRetries: 3,
             retryDelay: 1000
@@ -35,9 +36,13 @@ class SkillsApp {
         this.state = {
             currentUser: null,
             masterSkills: null,
+            skillLevelsMapping: null,
+            skillLookup: null,
             selectedSkills: new Map(),
+            missingSkills: [],
             currentL1: null,
             currentL2: null,
+            currentL3: null,
             isLoading: false
         };
 
@@ -54,6 +59,7 @@ class SkillsApp {
         try {
             this.initializeElements();
             this.attachEventListeners();
+            await this.loadSkillLevelsMapping();
             await this.loadMasterSkills();
             console.log('Skills Selector Application initialized successfully');
         } catch (error) {
@@ -80,6 +86,9 @@ class SkillsApp {
             saveSkillsBtn: document.getElementById('saveSkillsBtn'),
             
             // Skills explorer
+            level1Title: document.getElementById('level1Title'),
+            level2Title: document.getElementById('level2Title'),
+            level3Title: document.getElementById('level3Title'),
             level1Skills: document.getElementById('level1Skills'),
             level2Skills: document.getElementById('level2Skills'),
             level3Skills: document.getElementById('level3Skills'),
@@ -112,6 +121,66 @@ class SkillsApp {
             });
         }
         // Download button removed per requirements.
+    }
+
+    /**
+     * Load skill levels mapping
+     */
+    async loadSkillLevelsMapping() {
+        try {
+            this.setLoading(true);
+            const response = await this.fetchWithRetry(this.config.skillLevelsMappingFile);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load skill levels mapping: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.state.skillLevelsMapping = data.skillNames;
+            
+            // Update UI titles with skill level names
+            this.updateSkillLevelTitles();
+            
+            console.log('Skill levels mapping loaded successfully');
+        } catch (error) {
+            console.error('Error loading skill levels mapping:', error);
+            this.showError('Failed to load skill level names. Using default names.');
+            // Fallback to default mapping
+            this.state.skillLevelsMapping = [
+                { level: 1, name: "Level 1 Capabilities" },
+                { level: 2, name: "Level 2 Capabilities" },
+                { level: 3, name: "Generic Skills" },
+                { level: 4, name: "Technologies" }
+            ];
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    /**
+     * Get skill name for a given level
+     */
+    getSkillLevelName(level) {
+        if (!this.state.skillLevelsMapping) {
+            return `Level ${level}`;
+        }
+        const mapping = this.state.skillLevelsMapping.find(m => m.level === level);
+        return mapping ? mapping.name : `Level ${level}`;
+    }
+
+    /**
+     * Update UI titles with skill level names
+     */
+    updateSkillLevelTitles() {
+        if (this.elements.level1Title) {
+            this.elements.level1Title.textContent = this.getSkillLevelName(1);
+        }
+        if (this.elements.level2Title) {
+            this.elements.level2Title.textContent = this.getSkillLevelName(2);
+        }
+        if (this.elements.level3Title) {
+            this.elements.level3Title.textContent = this.getSkillLevelName(3);
+        }
     }
 
     /**
@@ -149,6 +218,10 @@ class SkillsApp {
                     })) : []
                 }));
             }
+            
+            // Build skill lookup index for fast O(1) access
+            this.buildSkillLookupIndex();
+            
             console.log('Master skills loaded (normalized):', this.state.masterSkills);
         } catch (error) {
             console.error('Error loading master skills:', error);
@@ -158,6 +231,63 @@ class SkillsApp {
         } finally {
             this.setLoading(false);
         }
+    }
+
+    /**
+     * Build skill lookup index for fast ID resolution
+     */
+    buildSkillLookupIndex() {
+        this.state.skillLookup = new Map();
+        
+        if (!Array.isArray(this.state.masterSkills)) return;
+        
+        // Index all skills by ID across all levels
+        this.state.masterSkills.forEach(l1 => {
+            this.state.skillLookup.set(l1.id, {
+                skill: l1,
+                level: 1,
+                path: { l1 }
+            });
+            
+            if (Array.isArray(l1.skills)) {
+                l1.skills.forEach(l2 => {
+                    this.state.skillLookup.set(l2.id, {
+                        skill: l2,
+                        level: 2,
+                        path: { l1, l2 }
+                    });
+                    
+                    if (Array.isArray(l2.skills)) {
+                        l2.skills.forEach(l3 => {
+                            this.state.skillLookup.set(l3.id, {
+                                skill: l3,
+                                level: 3,
+                                path: { l1, l2, l3 }
+                            });
+                            
+                            if (Array.isArray(l3.skills)) {
+                                l3.skills.forEach(l4 => {
+                                    this.state.skillLookup.set(l4.id, {
+                                        skill: l4,
+                                        level: 4,
+                                        path: { l1, l2, l3, l4 }
+                                    });
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        
+        console.log(`Skill lookup index built: ${this.state.skillLookup.size} skills indexed`);
+    }
+
+    /**
+     * Resolve skill by ID from lookup index
+     */
+    resolveSkillById(skillId) {
+        return this.state.skillLookup.get(skillId);
     }
 
     /**
@@ -288,9 +418,21 @@ class SkillsApp {
             const response = await this.fetchWithRetry(skillsFile);
             
             if (response.ok) {
-                const userSkills = await response.json();
+                const data = await response.json();
+                // Handle both old format (array) and new format (object with selectedSkills)
+                const userSkills = data.selectedSkills || data;
                 this.loadSelectedSkillsFromData(userSkills);
-                this.showToast('Your existing skills have been loaded', 'success');
+                
+                // Show missing skills banner if any skills couldn't be resolved
+                this.showMissingSkillsBanner();
+                
+                // Display last updated time if available
+                if (data.lastUpdated) {
+                    const lastUpdated = new Date(data.lastUpdated).toLocaleString();
+                    this.showToast(`Skills loaded (last updated: ${lastUpdated})`, 'success');
+                } else {
+                    this.showToast('Your existing skills have been loaded', 'success');
+                }
             }
         } catch (error) {
             console.error('Error loading user skills:', error);
@@ -303,7 +445,86 @@ class SkillsApp {
      */
     loadSelectedSkillsFromData(userSkills) {
         this.state.selectedSkills.clear();
-        if (Array.isArray(userSkills)) {
+        this.state.missingSkills = [];
+        
+        if (!Array.isArray(userSkills) || userSkills.length === 0) {
+            this.updateSelectedSkillsDisplay();
+            return;
+        }
+        
+        // Check if this is the new flat format or old hierarchical format
+        const isNewFormat = userSkills[0].hasOwnProperty('l1Id');
+        
+        if (isNewFormat) {
+            // New flat format with only IDs
+            userSkills.forEach(selection => {
+                const { l1Id, l2Id, l3Id, l4Ids } = selection;
+                
+                // Resolve skills from master using lookup index
+                const l1Data = this.resolveSkillById(l1Id);
+                const l2Data = this.resolveSkillById(l2Id);
+                const l3Data = this.resolveSkillById(l3Id);
+                
+                // Check for missing skills
+                if (!l1Data) {
+                    this.state.missingSkills.push({ id: l1Id, level: 1 });
+                    console.warn(`L1 skill not found: ${l1Id}`);
+                    return;
+                }
+                if (!l2Data) {
+                    this.state.missingSkills.push({ id: l2Id, level: 2 });
+                    console.warn(`L2 skill not found: ${l2Id}`);
+                    return;
+                }
+                if (!l3Data) {
+                    this.state.missingSkills.push({ id: l3Id, level: 3 });
+                    console.warn(`L3 skill not found: ${l3Id}`);
+                    return;
+                }
+                
+                // Resolve L4 skills
+                const l4Skills = [];
+                if (Array.isArray(l4Ids)) {
+                    l4Ids.forEach(l4Id => {
+                        const l4Data = this.resolveSkillById(l4Id);
+                        if (l4Data) {
+                            l4Skills.push({
+                                id: l4Id,
+                                title: l4Data.skill.title,
+                                description: l4Data.skill.description
+                            });
+                        } else {
+                            this.state.missingSkills.push({ id: l4Id, level: 4 });
+                            console.warn(`L4 skill not found: ${l4Id}`);
+                        }
+                    });
+                }
+                
+                // Build selection key and store
+                const key = this.buildSelectionKey(l1Id, l2Id, l3Id);
+                this.state.selectedSkills.set(key, {
+                    key,
+                    l1: { 
+                        id: l1Id, 
+                        title: l1Data.skill.title, 
+                        description: l1Data.skill.description 
+                    },
+                    l2: { 
+                        id: l2Id, 
+                        title: l2Data.skill.title, 
+                        description: l2Data.skill.description 
+                    },
+                    l3: { 
+                        id: l3Id, 
+                        title: l3Data.skill.title, 
+                        description: l3Data.skill.description 
+                    },
+                    l4Skills: l4Skills
+                });
+            });
+        } else {
+            // Old hierarchical format with titles/descriptions - convert and warn
+            console.warn('Loading old skill format - this will be converted to new format on next save');
             userSkills.forEach(l1 => {
                 if (!Array.isArray(l1.skills)) return;
                 l1.skills.forEach(l2 => {
@@ -311,17 +532,34 @@ class SkillsApp {
                     l2.skills.forEach(l3 => {
                         if (l3.level === 3) {
                             const key = this.buildSelectionKey(l1.id, l2.id, l3.id);
+                            
+                            // Extract L4 skills if they exist
+                            const l4Skills = Array.isArray(l3.skills) 
+                                ? l3.skills.filter(l4 => l4.level === 4).map(l4 => ({
+                                    id: l4.id,
+                                    title: l4.title,
+                                    description: l4.description || ''
+                                  }))
+                                : [];
+                            
                             this.state.selectedSkills.set(key, {
                                 key,
                                 l1: { id: l1.id, title: l1.title, description: l1.description },
                                 l2: { id: l2.id, title: l2.title, description: l2.description },
-                                l3: { id: l3.id, title: l3.title, description: l3.description }
+                                l3: { id: l3.id, title: l3.title, description: l3.description },
+                                l4Skills: l4Skills
                             });
                         }
                     });
                 });
             });
         }
+        
+        // Show missing skills banner if any
+        if (this.state.missingSkills.length > 0) {
+            this.showMissingSkillsBanner();
+        }
+        
         this.updateSelectedSkillsDisplay();
     }
 
@@ -409,23 +647,260 @@ class SkillsApp {
     }
 
     /**
-     * Render Level 3 skills (selectable)
+     * Render Level 3 skills (with Level 4 technology selectors)
      */
     renderLevel3Skills(l3Skills) {
         const html = l3Skills
             .map(skill => {
                 const key = this.buildSelectionKey(this.state.currentL1, this.state.currentL2, skill.id);
-                return this.createSkillCard(key, { title: skill.title, description: skill.description }, 'selectable', this.state.selectedSkills.has(key));
+                const isSelected = this.state.selectedSkills.has(key);
+                const hasL4Skills = Array.isArray(skill.skills) && skill.skills.length > 0;
+                
+                return this.createL3SkillCard(key, skill, isSelected, hasL4Skills);
             }).join('');
         this.elements.level3Skills.innerHTML = html;
+        
+        // Attach event listeners for L3 cards and L4 dropdowns
+        this.attachLevel3EventListeners();
+    }
+
+    /**
+     * Create Level 3 skill card with Level 4 technology button
+     */
+    createL3SkillCard(key, skill, isSelected, hasL4Skills) {
+        const selectedClass = isSelected ? 'selected' : '';
+        const selectedIndicator = isSelected ? '<span class="selected-indicator">Selected</span>' : '';
+        
+        let l4Button = '';
+        if (hasL4Skills) {
+            const l4Name = this.getSkillLevelName(4);
+            const selectedL4 = this.state.selectedSkills.get(key)?.l4Skills || [];
+            const selectedCount = selectedL4.length;
+            
+            l4Button = `
+                <div class="l4-technologies-section">
+                    <button class="l4-select-btn" data-l3-key="${key}" data-l3-title="${skill.title}" type="button">
+                        <span class="l4-btn-icon">⚙</span>
+                        ${selectedCount > 0 ? `${selectedCount} ${l4Name} Selected` : `Select ${l4Name}`}
+                    </button>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="skill-card selectable ${selectedClass}" data-skill-id="${key}">
+                ${selectedIndicator}
+                <div class="skill-card-title">${skill.title}</div>
+                <div class="skill-card-description">${skill.description}</div>
+                ${l4Button}
+            </div>`;
+    }
+
+    /**
+     * Attach event listeners for Level 3 cards and Level 4 buttons
+     */
+    attachLevel3EventListeners() {
+        // Toggle L3 selection when clicking the card (but not the button area)
         this.elements.level3Skills.onclick = (e) => {
+            // Ignore clicks on technology button
+            if (e.target.closest('.l4-technologies-section')) {
+                return;
+            }
             const card = e.target.closest('.skill-card');
-            if (card) this.toggleL3Skill(card.dataset.skillId);
+            if (card) {
+                this.toggleL3Skill(card.dataset.skillId);
+            }
+        };
+        
+        // Handle L4 technology selection button clicks
+        const l4Buttons = this.elements.level3Skills.querySelectorAll('.l4-select-btn');
+        l4Buttons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const l3Key = button.dataset.l3Key;
+                const l3Title = button.dataset.l3Title;
+                this.showL4TechnologyModal(l3Key, l3Title);
+            });
+        });
+    }
+
+    /**
+     * Show Level 4 technology selection modal
+     */
+    showL4TechnologyModal(l3Key, l3Title) {
+        const { l1Id, l2Id, l3Id } = this.parseSelectionKey(l3Key);
+        const l1Skill = this.state.masterSkills.find(s => s.id === l1Id);
+        const l2Skill = l1Skill ? l1Skill.skills.find(s => s.id === l2Id) : null;
+        const l3Skill = l2Skill ? l2Skill.skills.find(s => s.id === l3Id) : null;
+        
+        if (!l3Skill || !Array.isArray(l3Skill.skills) || l3Skill.skills.length === 0) {
+            return;
+        }
+        
+        const l4Name = this.getSkillLevelName(4);
+        const selectedL4 = this.state.selectedSkills.get(l3Key)?.l4Skills || [];
+        const selectedL4Ids = selectedL4.map(s => s.id);
+        
+        // Create modal HTML
+        const modalHtml = `
+            <div class="l4-modal-overlay" id="l4ModalOverlay">
+                <div class="l4-modal">
+                    <div class="l4-modal-header">
+                        <h3>${l4Name} for "${l3Title}"</h3>
+                        <button class="l4-modal-close" id="l4ModalClose" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="l4-modal-body">
+                        <div class="l4-modal-grid">
+                            ${l3Skill.skills.map(l4 => `
+                                <div class="l4-tech-card ${selectedL4Ids.includes(l4.id) ? 'selected' : ''}" 
+                                     data-l4-id="${l4.id}" 
+                                     data-l4-title="${l4.title}"
+                                     data-l4-description="${l4.description || ''}">
+                                    <span class="l4-tech-selected-indicator">✓</span>
+                                    <div class="l4-tech-title">${l4.title}</div>
+                                    <div class="l4-tech-description">${l4.description || ''}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="l4-modal-footer">
+                        <button class="btn btn-secondary" id="l4ModalCancel">Cancel</button>
+                        <button class="btn btn-primary" id="l4ModalDone">Done</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Get modal elements
+        const overlay = document.getElementById('l4ModalOverlay');
+        const closeBtn = document.getElementById('l4ModalClose');
+        const cancelBtn = document.getElementById('l4ModalCancel');
+        const doneBtn = document.getElementById('l4ModalDone');
+        const techCards = overlay.querySelectorAll('.l4-tech-card');
+        
+        // Handle technology card selection
+        techCards.forEach(card => {
+            card.addEventListener('click', () => {
+                card.classList.toggle('selected');
+            });
+        });
+        
+        // Close modal handlers
+        const closeModal = () => {
+            overlay.remove();
+        };
+        
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                closeModal();
+            }
+        });
+        
+        // Done button - save selections
+        doneBtn.addEventListener('click', () => {
+            const selectedCards = overlay.querySelectorAll('.l4-tech-card.selected');
+            const selectedTechnologies = Array.from(selectedCards).map(card => ({
+                id: card.dataset.l4Id,
+                title: card.dataset.l4Title,
+                description: card.dataset.l4Description
+            }));
+            
+            this.handleL4Selection(l3Key, selectedTechnologies);
+            closeModal();
+        });
+        
+        // Prevent body scroll when modal is open
+        document.body.style.overflow = 'hidden';
+        
+        // Restore body scroll when modal closes
+        const originalRemove = overlay.remove.bind(overlay);
+        overlay.remove = function() {
+            document.body.style.overflow = '';
+            originalRemove();
         };
     }
 
     /**
-     * Toggle L3 skill selection
+     * Handle Level 4 technology selection from modal
+     */
+    handleL4Selection(l3Key, selectedTechnologies) {
+        const { l1Id, l2Id, l3Id } = this.parseSelectionKey(l3Key);
+        const l1Skill = this.state.masterSkills.find(s => s.id === l1Id);
+        const l2Skill = l1Skill ? l1Skill.skills.find(s => s.id === l2Id) : null;
+        const l3Skill = l2Skill ? l2Skill.skills.find(s => s.id === l3Id) : null;
+        
+        if (!l1Skill || !l2Skill || !l3Skill) return;
+        
+        // If technologies are selected, auto-select the L3 skill
+        if (selectedTechnologies.length > 0) {
+            this.state.selectedSkills.set(l3Key, {
+                key: l3Key,
+                l1: { id: l1Id, title: l1Skill.title, description: l1Skill.description },
+                l2: { id: l2Id, title: l2Skill.title, description: l2Skill.description },
+                l3: { id: l3Id, title: l3Skill.title, description: l3Skill.description },
+                l4Skills: selectedTechnologies
+            });
+            this.showToast(`${selectedTechnologies.length} ${this.getSkillLevelName(4).toLowerCase()} selected`, 'success');
+        } else {
+            // If no technologies selected, deselect the L3 skill
+            if (this.state.selectedSkills.has(l3Key)) {
+                this.state.selectedSkills.delete(l3Key);
+                this.showToast('Skill deselected', 'success');
+            }
+        }
+        
+        // Update UI
+        this.updateSelectedSkillsDisplay();
+        if (l2Skill) this.renderLevel3Skills(l2Skill.skills);
+    }
+
+    /**
+     * Show missing skills banner if there are skills that couldn't be resolved
+     */
+    showMissingSkillsBanner() {
+        const banner = document.getElementById('missingSkillsBanner');
+        const countEl = document.getElementById('missingSkillsCount');
+        const listEl = document.getElementById('missingSkillsList');
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+        const dismissBtn = document.getElementById('dismissBannerBtn');
+        
+        if (!banner || this.state.missingSkills.length === 0) {
+            if (banner) banner.style.display = 'none';
+            return;
+        }
+        
+        // Show banner
+        banner.style.display = 'block';
+        
+        // Set count
+        countEl.textContent = this.state.missingSkills.length;
+        
+        // Set timestamp
+        const now = new Date();
+        lastUpdatedEl.textContent = now.toLocaleString();
+        
+        // List missing skill IDs with level information
+        listEl.innerHTML = this.state.missingSkills
+            .map(item => `<div><strong>L${item.level}:</strong> ${item.id}</div>`)
+            .join('');
+        
+        // Dismiss button handler
+        if (dismissBtn && !dismissBtn.dataset.listenerAttached) {
+            dismissBtn.dataset.listenerAttached = 'true';
+            dismissBtn.addEventListener('click', () => {
+                banner.style.display = 'none';
+            });
+        }
+    }
+
+    /**
+     * Toggle L3 skill selection (direct card click without using technology modal)
      */
     toggleL3Skill(selectionKey) {
         const { l1Id, l2Id, l3Id } = this.parseSelectionKey(selectionKey);
@@ -433,15 +908,28 @@ class SkillsApp {
         const l2Skill = l1Skill ? l1Skill.skills.find(s => s.id === l2Id) : null;
         const l3Skill = l2Skill ? l2Skill.skills.find(s => s.id === l3Id) : null;
         if (!l1Skill || !l2Skill || !l3Skill) return;
+        
+        // Check if this skill has L4 technologies
+        const hasL4Skills = Array.isArray(l3Skill.skills) && l3Skill.skills.length > 0;
+        
         if (this.state.selectedSkills.has(selectionKey)) {
+            // Deselect the skill
             this.state.selectedSkills.delete(selectionKey);
             this.showToast('Skill removed', 'success');
         } else {
+            // If skill has L4 technologies, open the modal instead
+            if (hasL4Skills) {
+                this.showL4TechnologyModal(selectionKey, l3Skill.title);
+                return;
+            }
+            
+            // Select skill without L4 technologies
             this.state.selectedSkills.set(selectionKey, {
                 key: selectionKey,
                 l1: { id: l1Id, title: l1Skill.title, description: l1Skill.description },
                 l2: { id: l2Id, title: l2Skill.title, description: l2Skill.description },
-                l3: { id: l3Id, title: l3Skill.title, description: l3Skill.description }
+                l3: { id: l3Id, title: l3Skill.title, description: l3Skill.description },
+                l4Skills: []
             });
             this.showToast('Skill added', 'success');
         }
@@ -480,20 +968,20 @@ class SkillsApp {
             return;
         }
 
-        // Group by L1 -> L2 -> list of L3
+        // Group by L1 -> L2 -> list of L3 (with L4)
         const grouped = {};
-        for (const { l1, l2, l3, key } of this.state.selectedSkills.values()) {
+        for (const { l1, l2, l3, l4Skills, key } of this.state.selectedSkills.values()) {
             if (!grouped[l1.id]) grouped[l1.id] = { meta: l1, children: {} };
             if (!grouped[l1.id].children[l2.id]) grouped[l1.id].children[l2.id] = { meta: l2, items: [] };
-            grouped[l1.id].children[l2.id].items.push({ l3, key });
+            grouped[l1.id].children[l2.id].items.push({ l3, l4Skills: l4Skills || [], key });
         }
         const htmlParts = [];
         Object.values(grouped).forEach(l1Group => {
             htmlParts.push(`<div class="selected-group"><div class="selected-group-title">${l1Group.meta.title}</div>`);
             Object.values(l1Group.children).forEach(l2Group => {
                 htmlParts.push(`<div class="selected-subgroup-title">${l2Group.meta.title}</div>`);
-                l2Group.items.forEach(({ l3, key }) => {
-                    htmlParts.push(this.createSelectedSkillItem(key, { l1: l1Group.meta, l2: l2Group.meta, l3 }));
+                l2Group.items.forEach(({ l3, l4Skills, key }) => {
+                    htmlParts.push(this.createSelectedSkillItem(key, { l1: l1Group.meta, l2: l2Group.meta, l3, l4Skills }));
                 });
             });
             htmlParts.push('</div>');
@@ -538,9 +1026,14 @@ class SkillsApp {
      * Create selected skill item HTML
      */
     createSelectedSkillItem(id, skillData) {
+        const l4TechnologiesHtml = skillData.l4Skills && skillData.l4Skills.length > 0
+            ? `<div class="skill-technologies">${skillData.l4Skills.map(l4 => `<span class="tech-tag">${l4.title}</span>`).join('')}</div>`
+            : '';
+        
         return `
             <div class="selected-skill-item">
                 <div class="skill-leaf-title">${skillData.l3.title}</div>
+                ${l4TechnologiesHtml}
                 <button class="remove-skill-btn" data-skill-id="${id}" aria-label="Remove skill ${skillData.l3.title}">×</button>
             </div>`;
     }
@@ -560,14 +1053,21 @@ class SkillsApp {
             // Create hierarchical structure for selected skills
             const userSkillsData = this.createUserSkillsStructure();
             
-            // Generate filename with timestamp (format: <email>-<timestamp>.json inside users/ folder)
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const emailPart = this.state.currentUser.email; // keep real email per requirement
-            const filenameOnly = `${emailPart}-${timestamp}.json`;
+            // Generate filename with email only (format: <email>.json inside users/ folder)
+            // Sanitize email for filename (replace special characters)
+            const emailPart = this.state.currentUser.email.replace(/[^a-zA-Z0-9@.-]/g, '_');
+            const filenameOnly = `${emailPart}.json`;
             const objectKey = `users/${filenameOnly}`;
             
-            // Save skills file
-            await this.saveFile(objectKey, userSkillsData);
+            // Add timestamp inside the JSON data
+            const dataWithTimestamp = {
+                userEmail: this.state.currentUser.email,
+                selectedSkills: userSkillsData,
+                lastUpdated: new Date().toISOString()
+            };
+            
+            // Save skills file (will overwrite existing file)
+            await this.saveFile(objectKey, dataWithTimestamp);
             
             // Update user record with skills file reference
             await this.updateUserSkillsFile(objectKey);
@@ -589,43 +1089,22 @@ class SkillsApp {
     // downloadUserSkills removed (feature deprecated)
 
     /**
-     * Create hierarchical structure for user skills
+     * Create flat structure for user skills (ID-only format)
      */
     createUserSkillsStructure() {
-        const byL1 = new Map();
+        const flatStructure = [];
+        
         for (const [, skillData] of this.state.selectedSkills) {
-            if (!byL1.has(skillData.l1.id)) {
-                byL1.set(skillData.l1.id, {
-                    id: skillData.l1.id,
-                    level: 1,
-                    title: skillData.l1.title,
-                    description: skillData.l1.description,
-                    skills: []
-                });
-            }
-            const l1Obj = byL1.get(skillData.l1.id);
-            let l2Obj = l1Obj.skills.find(s => s.id === skillData.l2.id);
-            if (!l2Obj) {
-                l2Obj = {
-                    id: skillData.l2.id,
-                    level: 2,
-                    title: skillData.l2.title,
-                    description: skillData.l2.description,
-                    skills: []
-                };
-                l1Obj.skills.push(l2Obj);
-            }
-            if (!l2Obj.skills.find(s => s.id === skillData.l3.id)) {
-                l2Obj.skills.push({
-                    id: skillData.l3.id,
-                    level: 3,
-                    title: skillData.l3.title,
-                    description: skillData.l3.description,
-                    skills: []
-                });
-            }
+            const selection = {
+                l1Id: skillData.l1.id,
+                l2Id: skillData.l2.id,
+                l3Id: skillData.l3.id,
+                l4Ids: (skillData.l4Skills || []).map(l4 => l4.id)
+            };
+            flatStructure.push(selection);
         }
-        return Array.from(byL1.values());
+        
+        return flatStructure;
     }
 
     /**

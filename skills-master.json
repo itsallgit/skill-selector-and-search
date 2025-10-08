@@ -1,102 +1,654 @@
 [
   {
-    "id": "L01S001",
+    "id": "L1VX34BJ",
     "level": 1,
-    "title": "Technology Consulting",
+    "title": "Technology",
     "description": "Expertise in technology strategy, implementation, and digital transformation initiatives. Includes enterprise architecture, system integration, and emerging technology adoption.",
     "skills": [
       {
-        "id": "L02S001",
+        "id": "L2ZG2HTE",
         "level": 2,
         "title": "Digital Strategy",
         "description": "Strategic planning and roadmap development for digital transformation initiatives and technology adoption.",
         "skills": [
-          { "id": "L03S001", "level": 3, "title": "Digital Transformation Planning", "description": "Developing comprehensive strategies for organizational digital transformation including technology roadmaps, change management, and ROI analysis." },
-          { "id": "L03S002", "level": 3, "title": "Technology Architecture Design", "description": "Designing scalable technology architectures that support business objectives and enable future growth and innovation." },
-          { "id": "L03S003", "level": 3, "title": "Innovation Strategy", "description": "Creating frameworks for continuous innovation, emerging technology evaluation, and digital product development strategies." },
-          { "id": "L03S004", "level": 3, "title": "Digital Operating Model Design", "description": "Developing new operating models that leverage digital technologies to improve efficiency, agility, and customer experience." },
-          { "id": "L03S005", "level": 3, "title": "Technology Vendor Assessment", "description": "Evaluating and selecting technology vendors, platforms, and solutions that align with strategic objectives and technical requirements." }
+          {
+            "id": "L3B1Q56G",
+            "level": 3,
+            "title": "Digital Transformation Planning",
+            "description": "Developing comprehensive strategies for organizational digital transformation including technology roadmaps, change management, and ROI analysis."
+          },
+          {
+            "id": "L3RN0LZY",
+            "level": 3,
+            "title": "Technology Architecture Design",
+            "description": "Designing scalable technology architectures that support business objectives and enable future growth and innovation."
+          },
+          {
+            "id": "L3TZ65JM",
+            "level": 3,
+            "title": "Digital Operating Model Design",
+            "description": "Developing new operating models that leverage digital technologies to improve efficiency, agility, and customer experience."
+          },
+          {
+            "id": "L36CUBVK",
+            "level": 3,
+            "title": "Technology Vendor Assessment",
+            "description": "Evaluating and selecting technology vendors, platforms, and solutions that align with strategic objectives and technical requirements."
+          }
         ]
       },
       {
-        "id": "L02S002",
+        "id": "L2B5980F",
         "level": 2,
         "title": "Cloud Solutions",
         "description": "Cloud platform architecture, migration strategies, and cloud-native application development and deployment.",
         "skills": [
-          { "id": "L03S001", "level": 3, "title": "Cloud Migration Strategy", "description": "Planning and executing migration of legacy systems and applications to cloud platforms with minimal disruption and maximum efficiency." },
-          { "id": "L03S002", "level": 3, "title": "Multi-Cloud Architecture", "description": "Designing and implementing solutions that span multiple cloud providers to optimize performance, cost, and risk management." },
-          { "id": "L03S003", "level": 3, "title": "Cloud Security Implementation", "description": "Implementing comprehensive security frameworks for cloud environments including identity management, data protection, and compliance." },
-          { "id": "L03S004", "level": 3, "title": "Cloud Cost Optimization", "description": "Analyzing and optimizing cloud resource usage and costs through monitoring, automation, and architectural improvements." },
-          { "id": "L03S005", "level": 3, "title": "Serverless Architecture", "description": "Designing and implementing serverless solutions using functions-as-a-service and event-driven architectures for scalable applications." }
+          {
+            "id": "L31C0VU2",
+            "level": 3,
+            "title": "Cloud Migration Strategy",
+            "description": "Planning and executing migration of legacy systems and applications to cloud platforms with minimal disruption and maximum efficiency.",
+            "skills": [
+              {
+                "id": "L430BJSR",
+                "level": 4,
+                "title": "AWS",
+                "description": "Amazon Web Services cloud platform"
+              },
+              {
+                "id": "L4JVG90F",
+                "level": 4,
+                "title": "Azure",
+                "description": "Microsoft Azure cloud platform"
+              },
+              {
+                "id": "L4AU1MHN",
+                "level": 4,
+                "title": "Google Cloud",
+                "description": "Google Cloud Platform (GCP)"
+              },
+              {
+                "id": "L4MUQ61L",
+                "level": 4,
+                "title": "Oracle Cloud",
+                "description": "Oracle Cloud Infrastructure"
+              }
+            ]
+          },
+          {
+            "id": "L387LN3G",
+            "level": 3,
+            "title": "Multi-Cloud Architecture",
+            "description": "Designing and implementing solutions that span multiple cloud providers to optimize performance, cost, and risk management.",
+            "skills": [
+              {
+                "id": "L4X0A2CQ",
+                "level": 4,
+                "title": "AWS",
+                "description": "Amazon Web Services cloud platform"
+              },
+              {
+                "id": "L4MG1CCA",
+                "level": 4,
+                "title": "Azure",
+                "description": "Microsoft Azure cloud platform"
+              },
+              {
+                "id": "L4YBWWGA",
+                "level": 4,
+                "title": "Google Cloud",
+                "description": "Google Cloud Platform (GCP)"
+              },
+              {
+                "id": "L4ALNXVK",
+                "level": 4,
+                "title": "Kubernetes",
+                "description": "Container orchestration platform"
+              },
+              {
+                "id": "L46RAPNZ",
+                "level": 4,
+                "title": "Terraform",
+                "description": "Infrastructure as Code tool"
+              }
+            ]
+          },
+          {
+            "id": "L3D7NJQB",
+            "level": 3,
+            "title": "Cloud Security Implementation",
+            "description": "Implementing comprehensive security frameworks for cloud environments including identity management, data protection, and compliance.",
+            "skills": [
+              {
+                "id": "L4ELA7A9",
+                "level": 4,
+                "title": "AWS IAM",
+                "description": "AWS Identity and Access Management"
+              },
+              {
+                "id": "L46LDMUD",
+                "level": 4,
+                "title": "Azure AD",
+                "description": "Azure Active Directory"
+              },
+              {
+                "id": "L4U4A8AD",
+                "level": 4,
+                "title": "Cloud Security Posture Management",
+                "description": "CSPM tools and practices"
+              },
+              {
+                "id": "L4D6A4W3",
+                "level": 4,
+                "title": "Zero Trust Architecture",
+                "description": "Zero Trust security frameworks"
+              }
+            ]
+          },
+          {
+            "id": "L37KY8K1",
+            "level": 3,
+            "title": "Cloud Cost Optimization",
+            "description": "Analyzing and optimizing cloud resource usage and costs through monitoring, automation, and architectural improvements.",
+            "skills": [
+              {
+                "id": "L4CAY19K",
+                "level": 4,
+                "title": "AWS Cost Explorer",
+                "description": "AWS cost management tool"
+              },
+              {
+                "id": "L4HLXBCK",
+                "level": 4,
+                "title": "Azure Cost Management",
+                "description": "Azure cost optimization tools"
+              },
+              {
+                "id": "L48Z6945",
+                "level": 4,
+                "title": "FinOps",
+                "description": "Financial operations practices"
+              }
+            ]
+          },
+          {
+            "id": "L3227QAX",
+            "level": 3,
+            "title": "Serverless Architecture",
+            "description": "Designing and implementing serverless solutions using functions-as-a-service and event-driven architectures for scalable applications.",
+            "skills": [
+              {
+                "id": "L4U3FUDX",
+                "level": 4,
+                "title": "AWS Lambda",
+                "description": "AWS serverless compute service"
+              },
+              {
+                "id": "L4HQYXHF",
+                "level": 4,
+                "title": "Azure Functions",
+                "description": "Azure serverless compute platform"
+              },
+              {
+                "id": "L4L60597",
+                "level": 4,
+                "title": "Google Cloud Functions",
+                "description": "GCP serverless platform"
+              },
+              {
+                "id": "L4YAC3T1",
+                "level": 4,
+                "title": "API Gateway",
+                "description": "API management and gateway services"
+              }
+            ]
+          }
         ]
       }
     ]
   },
   {
-    "id": "L01S002",
+    "id": "L1Z39DT0",
     "level": 1,
     "title": "Business Process Consulting",
     "description": "Optimization of business processes, workflow automation, and operational excellence initiatives to improve efficiency and effectiveness.",
     "skills": [
       {
-  "id": "L02S001",
+        "id": "L2XCHJ14",
         "level": 2,
         "title": "Process Improvement",
         "description": "Analysis and optimization of existing business processes to eliminate waste, reduce costs, and improve quality.",
         "skills": [
-          { "id": "L03S001", "level": 3, "title": "Lean Six Sigma Implementation", "description": "Applying Lean Six Sigma methodologies to identify inefficiencies, reduce waste, and improve process quality and performance." },
-          { "id": "L03S002", "level": 3, "title": "Business Process Reengineering", "description": "Fundamental redesign of business processes to achieve dramatic improvements in performance, quality, and customer satisfaction." },
-          { "id": "L03S003", "level": 3, "title": "Workflow Automation Design", "description": "Designing and implementing automated workflows using technology to streamline operations and reduce manual intervention." },
-          { "id": "L03S004", "level": 3, "title": "Performance Metrics Development", "description": "Creating comprehensive performance measurement systems including KPIs, dashboards, and reporting frameworks." },
-          { "id": "L03S005", "level": 3, "title": "Change Management", "description": "Managing organizational change initiatives including stakeholder engagement, communication strategies, and resistance management." }
+          {
+            "id": "L3731GQ3",
+            "level": 3,
+            "title": "Lean Six Sigma Implementation",
+            "description": "Applying Lean Six Sigma methodologies to identify inefficiencies, reduce waste, and improve process quality and performance."
+          },
+          {
+            "id": "L3B21UFJ",
+            "level": 3,
+            "title": "Business Process Reengineering",
+            "description": "Fundamental redesign of business processes to achieve dramatic improvements in performance, quality, and customer satisfaction."
+          },
+          {
+            "id": "L3U12F6A",
+            "level": 3,
+            "title": "Workflow Automation Design",
+            "description": "Designing and implementing automated workflows using technology to streamline operations and reduce manual intervention."
+          },
+          {
+            "id": "L328Y0HE",
+            "level": 3,
+            "title": "Performance Metrics Development",
+            "description": "Creating comprehensive performance measurement systems including KPIs, dashboards, and reporting frameworks."
+          },
+          {
+            "id": "L34TCX9W",
+            "level": 3,
+            "title": "Change Management",
+            "description": "Managing organizational change initiatives including stakeholder engagement, communication strategies, and resistance management."
+          }
         ]
       },
       {
-        "id": "L02S002",
+        "id": "L201YZ9T",
         "level": 2,
         "title": "Operations Excellence",
         "description": "Implementing operational excellence frameworks, quality management systems, and continuous improvement methodologies.",
         "skills": [
-          { "id": "L03S001", "level": 3, "title": "Quality Management Systems", "description": "Implementing and maintaining quality management systems including ISO standards, quality audits, and continuous improvement processes." },
-          { "id": "L03S002", "level": 3, "title": "Supply Chain Optimization", "description": "Optimizing supply chain operations including vendor management, inventory optimization, and logistics improvement initiatives." },
-          { "id": "L03S003", "level": 3, "title": "Risk Management Framework", "description": "Developing comprehensive risk management frameworks including risk assessment, mitigation strategies, and compliance monitoring." },
-          { "id": "L03S004", "level": 3, "title": "Customer Experience Optimization", "description": "Improving customer experience through journey mapping, touchpoint optimization, and customer feedback integration." },
-          { "id": "L03S005", "level": 3, "title": "Data-Driven Decision Making", "description": "Implementing analytics and reporting systems to support evidence-based decision making and performance monitoring." }
+          {
+            "id": "L3SZMHB8",
+            "level": 3,
+            "title": "Quality Management Systems",
+            "description": "Implementing and maintaining quality management systems including ISO standards, quality audits, and continuous improvement processes."
+          },
+          {
+            "id": "L30YS6FG",
+            "level": 3,
+            "title": "Supply Chain Optimization",
+            "description": "Optimizing supply chain operations including vendor management, inventory optimization, and logistics improvement initiatives."
+          },
+          {
+            "id": "L31WVUSS",
+            "level": 3,
+            "title": "Risk Management Framework",
+            "description": "Developing comprehensive risk management frameworks including risk assessment, mitigation strategies, and compliance monitoring."
+          },
+          {
+            "id": "L3DSNDAJ",
+            "level": 3,
+            "title": "Customer Experience Optimization",
+            "description": "Improving customer experience through journey mapping, touchpoint optimization, and customer feedback integration."
+          },
+          {
+            "id": "L35VPJFU",
+            "level": 3,
+            "title": "Data-Driven Decision Making",
+            "description": "Implementing analytics and reporting systems to support evidence-based decision making and performance monitoring."
+          }
         ]
       }
     ]
   },
   {
-    "id": "L01S003",
+    "id": "L19E99GG",
     "level": 1,
     "title": "Data Analytics & Intelligence",
     "description": "Advanced analytics, business intelligence, machine learning, and data science capabilities to drive insights and business value.",
     "skills": [
       {
-  "id": "L02S001",
+        "id": "L208WCXX",
         "level": 2,
         "title": "Business Intelligence",
         "description": "Development and implementation of business intelligence solutions including data warehousing, reporting, and visualization.",
         "skills": [
-          { "id": "L03S001", "level": 3, "title": "Data Warehouse Design", "description": "Designing and implementing enterprise data warehouses including dimensional modeling, ETL processes, and data governance frameworks." },
-          { "id": "L03S002", "level": 3, "title": "Advanced Analytics Reporting", "description": "Creating sophisticated reporting solutions with interactive dashboards, automated insights, and self-service analytics capabilities." },
-          { "id": "L03S003", "level": 3, "title": "Data Visualization Strategy", "description": "Developing comprehensive data visualization strategies including tool selection, design standards, and user experience optimization." },
-          { "id": "L03S004", "level": 3, "title": "Performance Analytics", "description": "Implementing performance analytics solutions to track, measure, and improve business KPIs and operational metrics." },
-          { "id": "L03S005", "level": 3, "title": "Predictive Analytics", "description": "Developing predictive models and forecasting solutions to anticipate trends, behaviors, and business outcomes." }
+          {
+            "id": "L3KHEK9Z",
+            "level": 3,
+            "title": "Data Warehouse Design",
+            "description": "Designing and implementing enterprise data warehouses including dimensional modeling, ETL processes, and data governance frameworks.",
+            "skills": [
+              {
+                "id": "L4KB2KVV",
+                "level": 4,
+                "title": "Snowflake",
+                "description": "Cloud data warehouse platform"
+              },
+              {
+                "id": "L4B5H9YQ",
+                "level": 4,
+                "title": "Amazon Redshift",
+                "description": "AWS data warehouse service"
+              },
+              {
+                "id": "L428QYNC",
+                "level": 4,
+                "title": "Azure Synapse",
+                "description": "Azure analytics service"
+              },
+              {
+                "id": "L4R24ST8",
+                "level": 4,
+                "title": "Google BigQuery",
+                "description": "GCP data warehouse"
+              },
+              {
+                "id": "L4N7SGZ0",
+                "level": 4,
+                "title": "dbt",
+                "description": "Data build tool"
+              }
+            ]
+          },
+          {
+            "id": "L3WCCKFM",
+            "level": 3,
+            "title": "Advanced Analytics Reporting",
+            "description": "Creating sophisticated reporting solutions with interactive dashboards, automated insights, and self-service analytics capabilities.",
+            "skills": [
+              {
+                "id": "L4RWX8L3",
+                "level": 4,
+                "title": "Power BI",
+                "description": "Microsoft business analytics tool"
+              },
+              {
+                "id": "L4D8X1WR",
+                "level": 4,
+                "title": "Tableau",
+                "description": "Data visualization platform"
+              },
+              {
+                "id": "L4V49DRE",
+                "level": 4,
+                "title": "Qlik",
+                "description": "Business intelligence platform"
+              },
+              {
+                "id": "L4VNE9U6",
+                "level": 4,
+                "title": "Looker",
+                "description": "Business intelligence software"
+              }
+            ]
+          },
+          {
+            "id": "L3D3N8E6",
+            "level": 3,
+            "title": "Data Visualization Strategy",
+            "description": "Developing comprehensive data visualization strategies including tool selection, design standards, and user experience optimization.",
+            "skills": [
+              {
+                "id": "L4CYY0JA",
+                "level": 4,
+                "title": "Power BI",
+                "description": "Microsoft business analytics tool"
+              },
+              {
+                "id": "L4YDLHXB",
+                "level": 4,
+                "title": "Tableau",
+                "description": "Data visualization platform"
+              },
+              {
+                "id": "L44V1ZYE",
+                "level": 4,
+                "title": "D3.js",
+                "description": "JavaScript visualization library"
+              },
+              {
+                "id": "L4X0CS0C",
+                "level": 4,
+                "title": "Plotly",
+                "description": "Interactive graphing library"
+              }
+            ]
+          },
+          {
+            "id": "L3BLDM2K",
+            "level": 3,
+            "title": "Performance Analytics",
+            "description": "Implementing performance analytics solutions to track, measure, and improve business KPIs and operational metrics.",
+            "skills": [
+              {
+                "id": "L4D2E20F",
+                "level": 4,
+                "title": "Power BI",
+                "description": "Microsoft business analytics tool"
+              },
+              {
+                "id": "L4T84189",
+                "level": 4,
+                "title": "Google Analytics",
+                "description": "Web analytics platform"
+              },
+              {
+                "id": "L4DA6R76",
+                "level": 4,
+                "title": "Datadog",
+                "description": "Monitoring and analytics platform"
+              },
+              {
+                "id": "L4WYB4P1",
+                "level": 4,
+                "title": "Grafana",
+                "description": "Observability and data visualization platform"
+              }
+            ]
+          },
+          {
+            "id": "L3JA1A20",
+            "level": 3,
+            "title": "Predictive Analytics",
+            "description": "Developing predictive models and forecasting solutions to anticipate trends, behaviors, and business outcomes.",
+            "skills": [
+              {
+                "id": "L411V1FM",
+                "level": 4,
+                "title": "Python",
+                "description": "Python programming language"
+              },
+              {
+                "id": "L44CU0K3",
+                "level": 4,
+                "title": "R",
+                "description": "Statistical programming language"
+              },
+              {
+                "id": "L44R0XV4",
+                "level": 4,
+                "title": "Scikit-learn",
+                "description": "Machine learning library"
+              },
+              {
+                "id": "L4EDC8JA",
+                "level": 4,
+                "title": "SAS",
+                "description": "Statistical analysis software"
+              }
+            ]
+          }
         ]
       },
       {
-        "id": "L02S002",
+        "id": "L28K6185",
         "level": 2,
         "title": "Machine Learning & AI",
         "description": "Implementation of machine learning algorithms, artificial intelligence solutions, and advanced data science techniques.",
         "skills": [
-          { "id": "L03S001", "level": 3, "title": "Machine Learning Model Development", "description": "Developing, training, and deploying machine learning models for classification, regression, clustering, and recommendation systems." },
-          { "id": "L03S002", "level": 3, "title": "Natural Language Processing", "description": "Implementing NLP solutions for text analysis, sentiment analysis, chatbots, and automated content generation." },
-          { "id": "L03S003", "level": 3, "title": "Computer Vision Solutions", "description": "Developing computer vision applications for image recognition, object detection, and automated visual inspection systems." },
-          { "id": "L03S004", "level": 3, "title": "AI Ethics and Governance", "description": "Implementing responsible AI practices including bias detection, fairness assessment, and ethical AI governance frameworks." },
-          { "id": "L03S005", "level": 3, "title": "MLOps Implementation", "description": "Implementing machine learning operations including model versioning, automated testing, deployment pipelines, and monitoring systems." }
+          {
+            "id": "L3FSL310",
+            "level": 3,
+            "title": "Machine Learning Model Development",
+            "description": "Developing, training, and deploying machine learning models for classification, regression, clustering, and recommendation systems.",
+            "skills": [
+              {
+                "id": "L4VHXD7F",
+                "level": 4,
+                "title": "Python",
+                "description": "Python programming language"
+              },
+              {
+                "id": "L4ZUBE2C",
+                "level": 4,
+                "title": "TensorFlow",
+                "description": "Machine learning framework"
+              },
+              {
+                "id": "L4SDD6AL",
+                "level": 4,
+                "title": "PyTorch",
+                "description": "Deep learning framework"
+              },
+              {
+                "id": "L4V42SBM",
+                "level": 4,
+                "title": "Scikit-learn",
+                "description": "Machine learning library"
+              },
+              {
+                "id": "L4JND7EU",
+                "level": 4,
+                "title": "XGBoost",
+                "description": "Gradient boosting library"
+              }
+            ]
+          },
+          {
+            "id": "L3NFND1N",
+            "level": 3,
+            "title": "Natural Language Processing",
+            "description": "Implementing NLP solutions for text analysis, sentiment analysis, chatbots, and automated content generation.",
+            "skills": [
+              {
+                "id": "L4PAKDPU",
+                "level": 4,
+                "title": "spaCy",
+                "description": "NLP library"
+              },
+              {
+                "id": "L4LF56F8",
+                "level": 4,
+                "title": "NLTK",
+                "description": "Natural Language Toolkit"
+              },
+              {
+                "id": "L4D7EN4T",
+                "level": 4,
+                "title": "Hugging Face Transformers",
+                "description": "Transformer models library"
+              },
+              {
+                "id": "L40S6J31",
+                "level": 4,
+                "title": "OpenAI API",
+                "description": "OpenAI language models"
+              },
+              {
+                "id": "L4TR1PH2",
+                "level": 4,
+                "title": "LangChain",
+                "description": "LLM application framework"
+              }
+            ]
+          },
+          {
+            "id": "L3MH7CT2",
+            "level": 3,
+            "title": "Computer Vision Solutions",
+            "description": "Developing computer vision applications for image recognition, object detection, and automated visual inspection systems.",
+            "skills": [
+              {
+                "id": "L48E7U39",
+                "level": 4,
+                "title": "OpenCV",
+                "description": "Computer vision library"
+              },
+              {
+                "id": "L4NMA0SP",
+                "level": 4,
+                "title": "YOLO",
+                "description": "Object detection framework"
+              },
+              {
+                "id": "L45M7CMH",
+                "level": 4,
+                "title": "TensorFlow Vision",
+                "description": "TensorFlow computer vision models"
+              },
+              {
+                "id": "L4JHB9VA",
+                "level": 4,
+                "title": "AWS Rekognition",
+                "description": "AWS image and video analysis service"
+              }
+            ]
+          },
+          {
+            "id": "L3PVMPM3",
+            "level": 3,
+            "title": "AI Ethics and Governance",
+            "description": "Implementing responsible AI practices including bias detection, fairness assessment, and ethical AI governance frameworks.",
+            "skills": [
+              {
+                "id": "L4BXX3B0",
+                "level": 4,
+                "title": "Fairlearn",
+                "description": "Fairness assessment toolkit"
+              },
+              {
+                "id": "L455V4DW",
+                "level": 4,
+                "title": "AI Fairness 360",
+                "description": "IBM fairness toolkit"
+              },
+              {
+                "id": "L4PESU8J",
+                "level": 4,
+                "title": "Model Cards",
+                "description": "Model documentation framework"
+              }
+            ]
+          },
+          {
+            "id": "L3W2YS8M",
+            "level": 3,
+            "title": "MLOps Implementation",
+            "description": "Implementing machine learning operations including model versioning, automated testing, deployment pipelines, and monitoring systems.",
+            "skills": [
+              {
+                "id": "L4VDHZBB",
+                "level": 4,
+                "title": "MLflow",
+                "description": "ML lifecycle management platform"
+              },
+              {
+                "id": "L4MQKMYN",
+                "level": 4,
+                "title": "Kubeflow",
+                "description": "ML toolkit for Kubernetes"
+              },
+              {
+                "id": "L4WTYRA2",
+                "level": 4,
+                "title": "Azure ML",
+                "description": "Azure Machine Learning service"
+              },
+              {
+                "id": "L4A7JMNS",
+                "level": 4,
+                "title": "SageMaker",
+                "description": "AWS machine learning platform"
+              },
+              {
+                "id": "L4912SCX",
+                "level": 4,
+                "title": "DVC",
+                "description": "Data Version Control"
+              }
+            ]
+          }
         ]
       }
     ]

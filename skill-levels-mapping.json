@@ -1,0 +1,20 @@
+{
+  "skillNames": [
+    {
+      "level": 1,
+      "name": "Level 1 Capabilities"
+    },
+    {
+      "level": 2,
+      "name": "Level 2 Capabilities"
+    },
+    {
+      "level": 3,
+      "name": "Generic Skills"
+    },
+    {
+      "level": 4,
+      "name": "Technologies"
+    }
+  ]
+}

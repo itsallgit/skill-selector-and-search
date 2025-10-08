@@ -54,8 +54,10 @@
               const skillsResp = await fetch(base + u.skillsFile);
               if(skillsResp.ok){
                 const data = await skillsResp.json();
+                // Handle both old format (array) and new format (object with selectedSkills)
+                const skillsData = data.selectedSkills || data;
                 // Count all level 3 nodes
-                let c=0; (data||[]).forEach(l1=> (l1.skills||[]).forEach(l2=> (l2.skills||[]).forEach(l3=> { if(l3.level===3) c++; })));
+                let c=0; (skillsData||[]).forEach(l1=> (l1.skills||[]).forEach(l2=> (l2.skills||[]).forEach(l3=> { if(l3.level===3) c++; })));
                 count = String(c);
               }
             } catch(_){}

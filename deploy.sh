@@ -23,6 +23,7 @@ print_status() { echo -e "${BLUE}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+print_confirm() { echo -e "${RED}[ATTENTION]${NC} $1"; }
 
 # Select AWS CLI profile
 select_aws_profile() {
@@ -91,6 +92,108 @@ detect_bucket_region() {
         loc="us-east-1"
     fi
     echo "$loc"
+}
+
+# Delete existing buckets with skills-selector pattern
+delete_existing_buckets() {
+    print_status "Checking for existing skills-selector buckets..."
+    
+    # List all buckets and filter for skills-selector pattern
+    existing_buckets=()
+    while IFS= read -r bucket; do
+        if [[ "$bucket" =~ ^skills-selector ]]; then
+            existing_buckets+=("$bucket")
+        fi
+    done < <(aws s3api list-buckets --profile "$AWS_PROFILE" --query 'Buckets[].Name' --output text 2>/dev/null | tr '\t' '\n')
+    
+    if [ ${#existing_buckets[@]} -eq 0 ]; then
+        print_status "No existing skills-selector buckets found."
+        return
+    fi
+    
+    echo
+    print_warning "Found ${#existing_buckets[@]} existing skills-selector bucket(s):"
+    for bucket in "${existing_buckets[@]}"; do
+        echo "  - $bucket"
+    done
+    echo
+    
+    read -p "Do you want to delete any of these buckets? (y/N): " -n 1 -r delete_choice
+    echo
+    
+    if [[ ! $delete_choice =~ ^[Yy]$ ]]; then
+        print_status "Skipping bucket deletion."
+        return
+    fi
+    
+    # Ask which buckets to delete
+    echo "Enter the bucket names to delete (space-separated), or 'all' for all buckets:"
+    read -r buckets_to_delete
+    
+    local delete_list=()
+    if [ "$buckets_to_delete" = "all" ]; then
+        delete_list=("${existing_buckets[@]}")
+    else
+        # Split input into array
+        read -ra input_buckets <<< "$buckets_to_delete"
+        for input_bucket in "${input_buckets[@]}"; do
+            # Verify bucket exists in the list
+            for existing_bucket in "${existing_buckets[@]}"; do
+                if [ "$input_bucket" = "$existing_bucket" ]; then
+                    delete_list+=("$input_bucket")
+                    break
+                fi
+            done
+        done
+    fi
+    
+    if [ ${#delete_list[@]} -eq 0 ]; then
+        print_warning "No valid buckets selected for deletion."
+        return
+    fi
+    
+    # Final confirmation
+    echo
+    print_warning "The following bucket(s) will be PERMANENTLY DELETED with ALL contents:"
+    for bucket in "${delete_list[@]}"; do
+        echo "  - $bucket"
+    done
+    echo
+    print_confirm "This action CANNOT be undone!"
+    read -p "Type 'DELETE' to confirm deletion: " confirmation
+    
+    if [ "$confirmation" != "DELETE" ]; then
+        print_warning "Deletion cancelled."
+        return
+    fi
+    
+    # Delete each bucket
+    for bucket in "${delete_list[@]}"; do
+        print_status "Deleting bucket: $bucket"
+        
+        # First, remove all objects and versions
+        print_status "Removing all objects from $bucket..."
+        aws s3 rm "s3://$bucket" --recursive --profile "$AWS_PROFILE" 2>/dev/null || true
+        
+        # Delete all versions if versioning is enabled
+        aws s3api delete-objects --bucket "$bucket" --profile "$AWS_PROFILE" \
+            --delete "$(aws s3api list-object-versions --bucket "$bucket" --profile "$AWS_PROFILE" \
+            --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' 2>/dev/null)" 2>/dev/null || true
+        
+        # Delete all delete markers
+        aws s3api delete-objects --bucket "$bucket" --profile "$AWS_PROFILE" \
+            --delete "$(aws s3api list-object-versions --bucket "$bucket" --profile "$AWS_PROFILE" \
+            --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' 2>/dev/null)" 2>/dev/null || true
+        
+        # Finally, delete the bucket itself
+        if aws s3api delete-bucket --bucket "$bucket" --profile "$AWS_PROFILE" 2>/dev/null; then
+            print_success "Bucket $bucket deleted successfully"
+        else
+            print_error "Failed to delete bucket $bucket (it may have remaining objects or delete protection)"
+        fi
+    done
+    
+    echo
 }
 
 # Prompt for existing bucket usage
@@ -318,6 +421,10 @@ main() {
     echo "========================================"; echo "Skills Selector - AWS Deployment"; echo "========================================"; echo
     select_aws_profile
     check_aws_cli
+    
+    # Check for existing buckets and offer deletion option
+    delete_existing_buckets
+    
     prompt_existing_bucket
 
     print_status "Starting deployment with the following configuration:"
@@ -340,7 +447,7 @@ main() {
     update_app_config
 
     if [ "$USING_EXISTING_BUCKET" = "1" ]; then
-        print_status "Deploying to existing bucket (preserving users-master.json) ..."
+        print_status "Deploying to existing bucket (preserving users-master.json and /users directory) ..."
         aws s3 sync . s3://$BUCKET_NAME \
             --profile "$AWS_PROFILE" \
             --exclude ".*" \
@@ -349,20 +456,22 @@ main() {
             --exclude "node_modules/*" \
             --exclude "package*.json" \
             --exclude "users-master.json" \
+            --exclude "users/*" \
             --delete
         aws s3 cp index.html s3://$BUCKET_NAME/index.html --content-type "text/html" --profile "$AWS_PROFILE"
         aws s3 cp styles.css s3://$BUCKET_NAME/styles.css --content-type "text/css" --profile "$AWS_PROFILE"
         aws s3 cp app.js s3://$BUCKET_NAME/app.js --content-type "application/javascript" --profile "$AWS_PROFILE"
         aws s3 cp skills-master.json s3://$BUCKET_NAME/skills-master.json --content-type "application/json" --profile "$AWS_PROFILE"
+        aws s3 cp skill-levels-mapping.json s3://$BUCKET_NAME/skill-levels-mapping.json --content-type "application/json" --profile "$AWS_PROFILE" || true
         aws s3 cp users.html s3://$BUCKET_NAME/users.html --content-type "text/html" --profile "$AWS_PROFILE" || true
-        print_success "Files deployed (users-master.json preserved)"
+        print_success "Files deployed (users-master.json and /users directory preserved)"
     else
         deploy_files
     fi
     
     echo
     echo "========================================"; print_success "Deployment completed successfully!"; echo "========================================"; echo
-    echo "Application URL:"; echo "$(get_website_url)"; echo
+    echo "Open the application in your browser:"; echo -e "${GREEN}$(get_website_url)${NC}"; echo
     print_warning "Security Note: Public access enabled. Review bucket policy before production use."; echo
 }
 
