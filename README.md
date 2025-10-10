@@ -41,9 +41,17 @@ data/                           # JSON data files (deployed to S3)
 ├── skill-ratings-mapping.json  # Skill proficiency level definitions
 └── users-master.json           # User registry and references
 
+scripts/                        # Shared deployment utilities
+├── config.sh                   # Configuration and constants
+├── logging.sh                  # Colored output utilities
+├── ui-prompts.sh               # User interaction prompts
+├── aws-auth.sh                 # AWS authentication and region detection
+└── bucket-operations.sh        # S3 bucket management operations
+
 docs/                           # Documentation
 
-deploy.sh                       # Unified deployment script
+deploy-skill-selector.sh        # Skills Selector application deployment
+deploy-skill-search.sh          # Skills Search infrastructure deployment
 README.md                       # This file
 ```
 
@@ -155,39 +163,65 @@ function generateSkillId(level, path) {
 2. **Review the structure**:
    ```bash
    ls -la
-   # Should see: skill-selector/, skill-search/, data/, docs/, deploy.sh, README.md
+   # Should see: skill-selector/, skill-search/, data/, scripts/, docs/, deploy-*.sh, README.md
    ```
 
-3. **Deploy to AWS**:
+3. **Deploy the Skills Selector Application**:
    ```bash
    # Make script executable
-   chmod +x deploy.sh
+   chmod +x deploy-skill-selector.sh
    
    # Run deployment
-   ./deploy.sh
+   ./deploy-skill-selector.sh
    ```
 
-4. **Follow the prompts**:
+4. **Deploy the Skills Search Infrastructure** (optional):
+   ```bash
+   # Make script executable
+   chmod +x deploy-skill-search.sh
+   
+   # Run deployment
+   ./deploy-skill-search.sh
+   ```
+
+5. **Follow the prompts**:
    - Select your AWS profile
-   - Choose to deploy the Skills Selector application (Y/n)
-   - Choose to execute vector bucket flow (Y/n)
+   - Choose deployment options (new/existing bucket, delete old buckets, etc.)
    - Get your application URL upon completion
 
 ## Deployment
 
-### Deployment Script Overview
+### Deployment Scripts Overview
 
-The `deploy.sh` script provides a comprehensive deployment workflow:
+The project uses two separate deployment scripts with shared utilities:
 
-**What it deploys to S3:**
+#### `deploy-skill-selector.sh`
+Deploys the Skills Selector web application to AWS S3:
+
+**What it deploys:**
 - From `skill-selector/`: Web application files (HTML, CSS, JS)
 - From `data/`: JSON data files (skills, users, mappings)
 - All files deployed to S3 bucket root (flat structure)
 
-**What it doesn't deploy:**
+#### `deploy-skill-search.sh`
+Provisions infrastructure for Skills Search semantic search:
+
+**What it deploys:**
+- AWS S3 Vector buckets for storing skill embeddings
+- Infrastructure for vector search operations
+
+#### Shared Utilities (`scripts/`)
+Both deployment scripts leverage reusable modules:
+- `config.sh` - Centralized configuration
+- `logging.sh` - Colored console output
+- `ui-prompts.sh` - Interactive user prompts
+- `aws-auth.sh` - AWS authentication and region detection
+- `bucket-operations.sh` - S3 bucket CRUD operations
+
+**What doesn't get deployed:**
 - `skill-search/` directory (Python backend, runs locally)
 - `docs/` directory (documentation)
-- `deploy.sh` itself
+- `scripts/` directory (deployment utilities)
 - `.git/` and other development files
 
 ## Skills Selector Application
@@ -394,7 +428,7 @@ open http://localhost:8000
 
 4. **Deploy changes**:
    ```bash
-   ./deploy.sh
+   ./deploy-skill-selector.sh
    # Use existing bucket to preserve user data
    ```
 

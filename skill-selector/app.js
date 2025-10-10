@@ -20,7 +20,7 @@ class SkillsApp {
             inferredRegion = restMatch[2];
         }
         this.config = {
-            bucketName: 'skills-selector', // placeholder replaced by deploy.sh
+            bucketName: 'skills-selector-1760061975', // placeholder replaced by deploy.sh
             region: 'ap-southeast-2',       // placeholder replaced by deploy.sh
             inferredBucket,
             inferredRegion,
