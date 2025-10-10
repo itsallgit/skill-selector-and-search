@@ -1,20 +1,51 @@
-# Skills Selector Application
+# Skills Selector & Search Platform
 
-A modern, responsive single-page application (SPA) for selecting and managing professional skills. Built to run on AWS S3 with public file access, this application provides a hierarchical skill selection interface with persistent storage.
+This project has two integrated capabilities:
 
-## Features
+1. **Skills Selector** - Web application for interactive skill selection and management
+2. **Skills Search** - Semantic search backend for finding users by skill expertise
 
-- **User Management**: Email-based user registration and profile management
-- **Hierarchical Skills**: Three-level skill structure (Categories → Sub-categories → Individual Skills)
-- **Interactive UI**: Modern, responsive design with responsive grid layout
-- **Persistent Storage**: User selections saved to S3 under `users/<email>-<timestamp>.json`
-- **Returning Users**: Automatic loading of previously selected skills (latest saved file referenced in `users-master.json`)
-- **Real-time Updates**: Dynamic skill exploration with live selection counts
-- **Selection Grouping**: Selected skills displayed grouped by Level 1 and Level 2 for readability
-- **Selection Indicators**: L3 skills show a “Selected” badge; L1/L2 tiles show aggregated selected counts
-- **Users Directory Page**: Dedicated `users.html` renders total user count and per-user selected skill counts
-- **Scroll Assist**: “View Selected Skills” button in explorer footer scrolls back to selection summary
-- **Zero Dependencies**: Pure HTML/CSS/JS (no build step required)
+> Please note: This is POC project that has deprioritised platform hardening and security in the interest of demonstrating value.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Repository Structure](#repository-structure)
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Deployment](#deployment)
+- [Skills Selector Application](#skills-selector-application)
+- [Skills Search Backend](#skills-search-backend)
+- [Data Management](#data-management)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Security Considerations](#security-considerations)
+
+## Repository Structure
+
+```
+skill-selector/                 # Web application (deployed to S3)
+├── index.html                  # Main skill explorer interface
+├── users.html                  # User listing and skill counts
+├── styles.css                  # Application styles
+└── app.js                      # Core application logic
+
+skill-search/                   # Semantic search backend (not deployed to S3)
+└── scripts/
+    ├── skill-embedding.py      # Generate vector embeddings from skills
+    └── user-skills-search.py   # Semantic search implementation
+
+data/                           # JSON data files (deployed to S3)
+├── skills-master.json          # Hierarchical skills database
+├── skill-levels-mapping.json   # Level number to semantic name mapping
+├── skill-ratings-mapping.json  # Skill proficiency level definitions
+└── users-master.json           # User registry and references
+
+docs/                           # Documentation
+
+deploy.sh                       # Unified deployment script
+README.md                       # This file
+```
 
 ## Application Structure
 
@@ -34,7 +65,7 @@ All skills in the system use **deterministic, collision-resistant IDs** that are
 
 #### Algorithm Details
 
-This has been included for future capabilities when skills can be added.
+This has been included for future capabilities if/when skills can be added view the application.
 
 ```javascript
 /**
@@ -82,26 +113,11 @@ function generateSkillId(level, path) {
 - **Hierarchical**: Level prefix provides quick visual identification
 - **Case-Insensitive**: Path is normalized before hashing for consistency
 
-### File Structure
-```
-/
-├── index.html              # Main application shell (skill explorer & selection UI)
-├── users.html              # Users listing (counts of selected skills)
-├── styles.css              # Application styles (includes navbar, grouping, badges)
-├── app.js                  # Core application logic
-├── skills-master.json      # Master skills hierarchical data (4 levels)
-├── skill-levels-mapping.json  # Maps level numbers to semantic names
-├── users-master.json       # User registry (email, skillsFile pointer, timestamps)
-├── generate_skill_ids.js   # Script to regenerate skill IDs
-├── deploy.sh               # AWS deployment automation
-└── README.md               # Documentation
-```
-
 ## Getting Started
 
 ### Prerequisites
 
-1. **AWS CLI**: Install and configure the AWS CLI
+1. **AWS CLI v2.15.0+**: Install and configure the AWS CLI
    ```bash
    # macOS
    brew install awscli
@@ -109,60 +125,111 @@ function generateSkillId(level, path) {
    # Linux (Ubuntu/Debian)
    sudo apt-get install awscli
    
-   # Linux (CentOS/RHEL)
-   sudo yum install awscli
+   # Windows
+   # Download from: https://aws.amazon.com/cli/
    ```
 
-2. **AWS Configuration**: Configure your AWS credentials
+2. **AWS Configuration**: Configure your AWS credentials and profile
    ```bash
-   aws configure
+   aws configure --profile your-profile-name
    ```
    
    You'll need:
    - AWS Access Key ID
    - AWS Secret Access Key
-   - Default region (ap-southeast-2 for Sydney)
-   - Output format (json)
+   - Default region (e.g., ap-southeast-2 for Sydney)
+   - Output format (json recommended)
 
-### Deployment
+3. **S3 Vectors Support** (for semantic search features):
+   - Ensure AWS CLI supports `s3vectors` commands
+   - Check with: `aws s3vectors list-vector-buckets --region your-region --profile your-profile`
 
-1. **Clone/Download** this repository to your local machine
+### Quick Start
 
-2. **Review Configuration**: Edit `deploy.sh` if needed to customize:
-   - Bucket name (auto-generated with timestamp by default)
-   - AWS region (set to Sydney/ap-southeast-2)
-   - AWS profile
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd skill-selector
+   ```
+
+2. **Review the structure**:
+   ```bash
+   ls -la
+   # Should see: skill-selector/, skill-search/, data/, docs/, deploy.sh, README.md
+   ```
 
 3. **Deploy to AWS**:
    ```bash
-   # Make the script executable (if not already)
+   # Make script executable
    chmod +x deploy.sh
    
-   # Run the deployment
+   # Run deployment
    ./deploy.sh
    ```
 
-### Deployment Script Features
+4. **Follow the prompts**:
+   - Select your AWS profile
+   - Choose to deploy the Skills Selector application (Y/n)
+   - Choose to execute vector bucket flow (Y/n)
+   - Get your application URL upon completion
 
-The deployment script (`deploy.sh`) is **idempotent** and handles:
+## Deployment
 
-- **AWS CLI Verification**: Checks if AWS CLI is installed and configured
-- **Bucket Creation**: Creates S3 bucket if it doesn't exist
-- **Static Website Hosting**: Configures bucket for web hosting
-- **CORS Configuration**: Sets up Cross-Origin Resource Sharing for file operations
-- **Public Access**: Configures bucket policy for public read access
-- **File Upload**: Uploads all application files to S3
-- **Success Reporting**: Provides the final application URL
+### Deployment Script Overview
 
-### Post-Deployment
+The `deploy.sh` script provides a comprehensive deployment workflow:
 
-After successful deployment, you'll receive:
-- **Application URL**: Direct link to your hosted application
-- **Bucket Information**: S3 bucket details and configuration
+**What it deploys to S3:**
+- From `skill-selector/`: Web application files (HTML, CSS, JS)
+- From `data/`: JSON data files (skills, users, mappings)
+- All files deployed to S3 bucket root (flat structure)
 
-## Usage
+**What it doesn't deploy:**
+- `skill-search/` directory (Python backend, runs locally)
+- `docs/` directory (documentation)
+- `deploy.sh` itself
+- `.git/` and other development files
 
-### For End Users
+## Skills Selector Application
+
+### File Structure (Deployed)
+
+When deployed to S3, files maintain a flat structure:
+```
+s3://skills-selector-<timestamp>/
+├── index.html                  # Main application
+├── users.html                  # Users page
+├── styles.css                  # Styles
+├── app.js                      # Application logic
+├── skills-master.json          # Skills database
+├── skill-levels-mapping.json   # Level mappings
+├── skill-ratings-mapping.json  # Rating definitions
+├── users-master.json           # User registry
+└── users/                      # User-specific skill files
+    ├── user@example.com.json
+    └── ...
+```
+
+### File Structure (Local Development)
+
+In the repository, files are organized by capability:
+```
+skill-selector/
+├── index.html              # Main application shell
+├── users.html              # Users listing page
+├── styles.css              # Application styles
+└── app.js                  # Core application logic
+
+data/
+├── skills-master.json      # Master skills database
+├── skill-levels-mapping.json  # Level mappings
+├── skill-ratings-mapping.json # Rating definitions
+└── users-master.json       # User registry
+```
+
+### Usage Guide
+
+#### For End Users
 
 1. **Access Application**: Navigate to the provided S3 website URL
 2. **Enter Email**: Provide your email address to create/access your profile
@@ -181,6 +248,12 @@ After successful deployment, you'll receive:
 #### Updating Skills
 
 Edit `skills-master.json` to modify the skill database. The file uses a nested array structure:
+
+### Skills Master Data
+
+**File**: `data/skills-master.json`
+
+Four-level hierarchical structure:
 
 ```json
 [
@@ -217,95 +290,158 @@ Edit `skills-master.json` to modify the skill database. The file uses a nested a
 ]
 ```
 
-**Adding New Skills**:
+### Mapping Files
 
-1. Determine the full hierarchical path for the new skill
-2. Generate the ID using the script:
-   ```bash
-   node generate_skill_ids.js
-   ```
-3. Add the skill object with the generated ID to the appropriate parent's `skills` array
-4. Include `id`, `level`, `title`, `description`, and optionally `skills` (for levels 1-3)
-
-**ID Format**: 
-- `L1{hash}` for Level 1 Capabilities
-- `L2{hash}` for Level 2 Capabilities
-- `L3{hash}` for Generic Skills
-- `L4{hash}` for Technologies
-
-See the **Skill ID Generation Algorithm** section above for details on how IDs are created.
-
-#### Re-deploying Changes
-
-After modifying skills:
-```bash
-./deploy.sh
+**skill-levels-mapping.json**: Maps level numbers to semantic names
+```json
+{
+  "1": "L1 Capabilities",
+  "2": "L2 Capabilities", 
+  "3": "Generic Skills",
+  "4": "Technologies"
+}
 ```
 
-The script will update only changed files.
+**skill-ratings-mapping.json**: Defines proficiency levels
+```json
+{
+  "1": "Beginner",
+  "2": "Intermediate",
+  "3": "Advanced"
+}
+```
+
+### User Data
+
+**users-master.json**: Registry of all users
+```json
+[
+  {
+    "email": "user@example.com",
+    "skillsFile": "users/user@example.com.json",
+    "lastUpdated": "2024-10-10T12:34:56Z"
+  }
+]
+```
 
 ## Architecture
 
-### Client-Side Application
-- **HTML5**: Semantic markup with accessibility considerations
-- **CSS3**: Modern styling with flexbox/grid, animations, and responsive design
-- **Vanilla JavaScript**: No external dependencies, ES6+ features
+### Technology Stack
 
-### AWS Infrastructure
-- **S3 Static Hosting**: Serves HTML, CSS, JS files
-- **S3 Object Storage**: Stores JSON data files
-- **CloudFront** (optional): Can be added for global CDN
+**Frontend (Skills Selector)**:
+- HTML5 - Semantic markup
+- CSS3 - Modern styling (Flexbox, Grid)
+- Vanilla JavaScript - No dependencies, ES6+
+
+**Backend (Skills Search)**:
+- Python 3.x
+- Vector embedding libraries (TBD)
+- AWS SDK for Python (boto3)
+
+**Infrastructure**:
+- AWS S3 - Static hosting and object storage
+- AWS S3 Vectors - Vector embedding storage
 
 ### Data Flow
-1. User enters email → App fetches `users-master.json` (or creates new entry)
-2. If user has `skillsFile`, fetch latest user skills JSON and hydrate selections
-3. Master hierarchy loaded from `skills-master.json`
-4. User selects L3 items; counts for parent L1/L2 update live
-5. Save generates `users/<email>-<timestamp>.json` via direct S3 PUT and updates `users-master.json`
-6. Selected skills panel renders grouped by L1 → L2 → L3
-7. Users page (`users.html`) enumerates users and counts L3 selections by reading their referenced file
+
+**Skill Selection Flow**:
+1. User accesses application via S3 website URL
+2. Browser loads HTML/CSS/JS from S3
+3. Application fetches `users-master.json` and `skills-master.json`
+4. User navigates hierarchy and selects skills
+5. Selections saved to `users/<email>.json` via S3 PUT
+6. `users-master.json` updated with new file reference
+
+**Vector Generation (TODO)**:
+
+**Search Flow (TODO)**:
+
+## Development
+
+### Local Development
+
+The Skills Selector application can be tested locally:
+
+```bash
+# Serve locally with Python
+cd skill-selector
+python3 -m http.server 8000
+
+# Open browser
+open http://localhost:8000
+```
+
+**Note**: Local testing won't persist data to S3. Deploy to AWS for full functionality.
+
+### Modifying Skills
+
+1. **Edit the data file**:
+   ```bash
+   # Open in your editor
+   code data/skills-master.json
+   ```
+
+2. **Follow the structure**:
+   - Maintain 4-level hierarchy
+   - Use deterministic IDs
+   - Include all required fields
+
+3. **Test locally** (optional):
+   ```bash
+   cd skill-selector
+   python3 -m http.server 8000
+   ```
+
+4. **Deploy changes**:
+   ```bash
+   ./deploy.sh
+   # Use existing bucket to preserve user data
+   ```
 
 ## Security Considerations
 
-⚠️ **Important**: Intended for **public / low-sensitivity data**.
+### Current State
 
-- Bucket policy currently allows public read (and may allow write if configured for direct PUT). This should be restricted for production by introducing an authenticated API or signed URLs.
-- Email addresses stored in plain text within `users-master.json`.
-- Consider enabling S3 Object Ownership & restricting public write access.
-- Add rate limiting / validation server-side if moving beyond prototype.
+⚠️ **Intended for internal/low-sensitivity use**
 
-## Browser Compatibility
+**Skills Selector Bucket**:
+- ✅ Public read access enabled (required for static hosting)
+- ✅ CORS configured for client-side operations
+- ⚠️ Email addresses stored in plain text
+- ⚠️ No authentication required for access
+- ⚠️ Anyone can view user skills
 
-- **Modern Browsers**: Chrome 60+, Firefox 60+, Safari 12+, Edge 79+
-- **Mobile**: iOS Safari 12+, Chrome Android 60+
-- **Features Used**: Fetch API, ES6 classes, CSS Grid/Flexbox
+**Vector Bucket**:
+- ✅ Always encrypted (SSE-S3)
+- ✅ Block Public Access enabled
+- ✅ IAM-based access control
+- ✅ Private by default
 
-## Customization
+### Production Hardening
 
-### Styling
-Edit `styles.css` to customize:
-- Color scheme (currently white/black/green)
-- Typography and spacing
-- Component layouts
-- Responsive breakpoints
+For production use, consider:
 
-### Behavior
-Edit `app.js` to modify:
-- Skill selection logic
-- Navigation behavior
-- Error handling
-- API interaction patterns
+1. **Authentication & Authorization**:
+   - Add user authentication (Cognito, OAuth)
+   - Implement role-based access control
+   - Restrict S3 bucket access to authenticated users
 
-### Content
-Edit `skills-master.json` to:
-- Add/remove skill categories
-- Modify descriptions
-- Reorganize hierarchy
+2. **Data Protection**:
+   - Encrypt email addresses
+   - Implement data retention policies
+   - Enable S3 versioning for data recovery
 
+3. **API Layer**:
+   - Add API Gateway + Lambda for backend
+   - Validate and sanitize all inputs
+   - Implement rate limiting
 
-# TODO
+4. **Monitoring**:
+   - Enable CloudTrail logging
+   - Set up CloudWatch alarms
+   - Monitor access patterns
 
-1. DONE - Only one user skills file per user
-2. Rename: L1 = L1 Capabilities, L2 = L2 Capabilities, L3 = Generic Skills, L4 = Technologies
-3. L3 ratings: Beginner, Intermediate, Advanced
-4. Ability to search users by skills
+5. **Network**:
+   - Use CloudFront for CDN
+   - Enable WAF for protection
+   - Restrict access by IP/geography if needed
