@@ -328,3 +328,111 @@ vector_bucket_exists() {
     local bucket_name="$1"
     aws s3vectors get-vector-bucket --vector-bucket-name "$bucket_name" --region "$REGION" --profile "$AWS_PROFILE" 2>/dev/null
 }
+
+# =============================================================================
+# VECTOR INDEX OPERATIONS
+# =============================================================================
+
+# Check if vector index exists in a vector bucket
+vector_index_exists() {
+    local bucket_name="$1"
+    local index_name="$2"
+    
+    aws s3vectors get-index \
+        --vector-bucket-name "$bucket_name" \
+        --index-name "$index_name" \
+        --region "$REGION" \
+        --profile "$AWS_PROFILE" 2>/dev/null
+}
+
+# List all vector indexes in a vector bucket
+list_vector_indexes() {
+    local bucket_name="$1"
+    
+    aws s3vectors list-indexes \
+        --vector-bucket-name "$bucket_name" \
+        --region "$REGION" \
+        --profile "$AWS_PROFILE" \
+        --query 'indexes[].indexName' \
+        --output text 2>/dev/null | tr '\t' '\n'
+}
+
+# Create vector index
+create_vector_index() {
+    local bucket_name="$1"
+    local index_name="$2"
+    local dimension="$3"
+    local distance_metric="$4"
+    local data_type="${5:-float32}"  # Default to float32 (only supported type)
+    
+    print_status "Creating vector index: $index_name"
+    print_status "Configuration:"
+    echo "  Bucket: $bucket_name"
+    echo "  Index: $index_name"
+    echo "  Data Type: $data_type"
+    echo "  Dimension: $dimension"
+    echo "  Distance Metric: $distance_metric"
+    echo "  Region: $REGION"
+    echo
+    
+    if aws s3vectors create-index \
+        --vector-bucket-name "$bucket_name" \
+        --index-name "$index_name" \
+        --data-type "$data_type" \
+        --dimension "$dimension" \
+        --distance-metric "$distance_metric" \
+        --region "$REGION" \
+        --profile "$AWS_PROFILE" 2>&1; then
+        print_success "Vector index '$index_name' created successfully"
+        return 0
+    else
+        print_error "Failed to create vector index '$index_name'"
+        return 1
+    fi
+}
+
+# Delete vector index
+delete_vector_index() {
+    local bucket_name="$1"
+    local index_name="$2"
+    
+    print_status "Deleting vector index: $index_name"
+    
+    if aws s3vectors delete-index \
+        --vector-bucket-name "$bucket_name" \
+        --index-name "$index_name" \
+        --region "$REGION" \
+        --profile "$AWS_PROFILE" 2>/dev/null; then
+        print_success "Vector index '$index_name' deleted successfully"
+        return 0
+    else
+        print_error "Failed to delete vector index '$index_name'"
+        return 1
+    fi
+}
+
+# Rename vector index by creating new one and noting the old name
+rename_vector_index() {
+    local bucket_name="$1"
+    local old_index_name="$2"
+    local new_index_name="$3"
+    local dimension="$4"
+    local distance_metric="$5"
+    local data_type="${6:-float32}"
+    
+    print_status "Renaming vector index from '$old_index_name' to '$new_index_name'..."
+    
+    # Note: S3 Vectors doesn't support direct rename, so we document this limitation
+    print_warning "Note: Vector indexes cannot be directly renamed in S3 Vectors."
+    print_warning "The old index '$old_index_name' will remain. You may delete it manually if needed."
+    
+    # Create the new index with timestamp
+    if create_vector_index "$bucket_name" "$new_index_name" "$dimension" "$distance_metric" "$data_type"; then
+        print_success "New timestamped index created: $new_index_name"
+        print_status "Original index preserved: $old_index_name"
+        return 0
+    else
+        return 1
+    fi
+}
+

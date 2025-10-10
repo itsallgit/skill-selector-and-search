@@ -36,6 +36,17 @@ BUCKET_PREFIX_SKILL_VECTORS="skills-vectors"
 SKILL_SELECTOR_DIR="skill-selector"
 DATA_DIR="data"
 
+# =============================================================================
+# VECTOR INDEX CONFIGURATION
+# =============================================================================
+
+# Vector index settings for semantic search
+VECTOR_INDEX_NAME="skills-index"
+VECTOR_DATA_TYPE="float32"  # Data type for vector embeddings (S3 Vectors only supports float32)
+VECTOR_EMBEDDING_DIM=1024
+VECTOR_DISTANCE_METRIC="cosine"  # Options: cosine, euclidean, dot-product
+EMBEDDING_MODEL_ID="amazon.titan-embed-text-v2:0"
+
 # Skill Selector Application - Deployment files
 SKILL_SELECTOR_FILES=(
     "index.html:text/html"

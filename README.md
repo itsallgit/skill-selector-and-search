@@ -32,14 +32,15 @@ skill-selector/                 # Web application (deployed to S3)
 
 skill-search/                   # Semantic search backend (not deployed to S3)
 └── scripts/
-    ├── skill-embedding.py      # Generate vector embeddings from skills
-    └── user-skills-search.py   # Semantic search implementation
+    ├── skill-embeddings.py     # Generate and upload skill vector embeddings
+    └── user-skills-search.py   # Semantic search implementation (TBD)
 
 data/                           # JSON data files (deployed to S3)
 ├── skills-master.json          # Hierarchical skills database
 ├── skill-levels-mapping.json   # Level number to semantic name mapping
 ├── skill-ratings-mapping.json  # Skill proficiency level definitions
-└── users-master.json           # User registry and references
+├── users-master.json           # User registry and references
+└── skill-embeddings.jsonl      # Generated skill embeddings cache (local only)
 
 scripts/                        # Shared deployment utilities
 ├── config.sh                   # Configuration and constants
@@ -358,6 +359,355 @@ Four-level hierarchical structure:
 ]
 ```
 
+## Skills Search Backend
+
+### Overview
+
+The Skills Search backend enables semantic search over the skills hierarchy using natural language queries. It uses AWS Bedrock Titan Embeddings V2 to generate vector representations of skills and stores them in AWS S3 Vector Buckets for efficient semantic matching.
+
+### Vector Index Configuration
+
+The semantic search capability uses the following configuration:
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| **Embedding Model** | Amazon Titan Embeddings V2 | AWS-native, cost-effective, optimized for semantic similarity |
+| **Embedding Dimension** | 1024 | Balances accuracy with performance; configurable for optimization |
+| **Distance Metric** | Cosine Similarity | Standard for text embeddings; normalized and independent of magnitude |
+| **Index Name** | `skills-index` | Static name within uniquely-named bucket for consistent references |
+
+**Why Cosine Similarity?**
+Cosine similarity is the standard distance metric for text embeddings because:
+- It's normalized (independent of vector magnitude)
+- It measures the angle between vectors, focusing on direction/meaning rather than scale
+- It's the recommended metric for Titan embeddings and most text embedding models
+- It better handles semantic similarity regardless of text length
+
+### Embedding Text Format
+
+Skills are embedded using a natural language format that provides hierarchical context for better semantic search results:
+
+**Format**: `"<title> - <description>. This is a <parent_title> <skill_type> within the broader <grandparent_title> domain."`
+
+**Examples:**
+- **L1 (Technology)**: 
+  ```
+  "Technology - Expertise in technology strategy, implementation, and digital transformation initiatives..."
+  ```
+
+- **L2 (Digital Strategy)**: 
+  ```
+  "Digital Strategy - Strategic planning and roadmap development for digital transformation... 
+   This is part of Technology."
+  ```
+
+- **L3 (Digital Transformation Planning)**: 
+  ```
+  "Digital Transformation Planning - Developing comprehensive strategies for organizational 
+   digital transformation... This is a Digital Strategy skill within the broader Technology domain."
+  ```
+
+- **L4 (AWS)**: 
+  ```
+  "AWS - Amazon Web Services cloud platform. This is a Cloud Solutions technology within the 
+   broader Technology domain."
+  ```
+
+**Why Natural Language?**
+Embedding models are trained on natural language, so sentence-like structures produce better semantic representations than structured formats (like JSON or dot-separated lists). This approach provides context about each skill's position in the hierarchy, improving search accuracy.
+
+### Skill Embeddings Generation
+
+The `skill-embeddings.py` script manages the vector embedding lifecycle:
+
+#### Process Flow
+
+1. **Flatten Skills**: Convert hierarchical skills-master.json to flat structure
+2. **Detect Changes**: Compare with cached skill-embeddings.jsonl to find new/modified skills
+3. **Generate Embeddings**: Call AWS Bedrock for changed skills only (batch processing)
+4. **Save Cache**: Update skill-embeddings.jsonl with all embeddings + metadata
+5. **Upload Vectors**: Batch insert all vectors into S3 Vector Index
+
+#### Change Detection
+
+The script maintains a `skill-embeddings.jsonl` file that caches:
+- Skill metadata (id, level, title, description, parents)
+- Generated embedding text
+- Vector embeddings
+- Last updated timestamp
+
+Skills are re-embedded only if:
+- The skill is new (ID not in cache)
+- Title or description has changed
+- Parent or ancestor relationships have changed (affects context)
+
+This optimization minimizes AWS Bedrock API calls and costs.
+
+#### Configuration
+
+Key configuration parameters in `skill-embeddings.py`:
+
+> Note: The project currently uses two AWS profiles to handle access to Bedrock and target account for the skill search backend. Eventually this will be consolidated.
+
+```python
+# AWS Profiles (can use different accounts/regions)
+BEDROCK_PROFILE = "exalm"           # For embedding generation
+BEDROCK_REGION = "us-east-1"
+S3VECTORS_PROFILE = "exalm"         # For vector storage
+S3VECTORS_REGION = "ap-southeast-2"
+
+# Vector Bucket & Index (set by deploy-skill-search.sh)
+VECTOR_BUCKET = "skills-vectors-<timestamp>"
+VECTOR_INDEX = "skills-index"
+
+# Processing
+EMBEDDING_BATCH_SIZE = 25           # Skills per Bedrock API call
+MAX_VECTORS_PER_UPLOAD = 50         # Vectors per S3 API call
+```
+
+#### Python Environment Setup
+
+The skill embeddings generator requires Python 3.8+ with AWS SDK (boto3). Follow these steps to set up your environment:
+
+##### Prerequisites
+
+- **Python 3.8+**: Check with `python3 --version`
+- **pyenv** (recommended): For Python version management
+  ```bash
+  # Install pyenv (if not already installed)
+  brew install pyenv
+  
+  # Add to your shell profile (~/.bash_profile or ~/.zshrc)
+  export PYENV_ROOT="$HOME/.pyenv"
+  export PATH="$PYENV_ROOT/bin:$PATH"
+  eval "$(pyenv init -)"
+  ```
+
+##### Setup Steps
+
+1. **Install Python 3.11 (recommended)**
+   ```bash
+   # Install Python 3.11 via pyenv
+   pyenv install 3.11.6
+   
+   # Set it as the local version for this project
+   cd /path/to/skill-selector-and-search
+   pyenv local 3.11.6
+   
+   # Verify
+   python3 --version  # Should show Python 3.11.6
+   ```
+
+2. **Create a Virtual Environment**
+   ```bash
+   # Navigate to the skill-search directory
+   cd skill-search
+   
+   # Create virtual environment
+   python3 -m venv venv
+   
+   # Activate the virtual environment
+   source venv/bin/activate
+   
+   # Your prompt should now show (venv)
+   ```
+
+3. **Install Dependencies**
+   ```bash
+   # Install required packages
+   pip install -r requirements.txt
+   
+   # Verify boto3 installation
+   python3 -c "import boto3; print(f'boto3 version: {boto3.__version__}')"
+   ```
+
+4. **Configure AWS Credentials**
+   
+   Ensure your AWS profiles are configured in `~/.aws/credentials` and `~/.aws/config`:
+   ```ini
+   # ~/.aws/credentials
+   [exalm]
+   aws_access_key_id = YOUR_ACCESS_KEY
+   aws_secret_access_key = YOUR_SECRET_KEY
+   
+   # ~/.aws/config
+   [profile exalm]
+   region = us-east-1
+   ```
+
+##### Running the Script
+
+```bash
+# 1. Deploy vector infrastructure (if not already done)
+./deploy-skill-search.sh
+
+# 2. Note the bucket name from deployment output (e.g., skills-vectors-1760131105)
+
+# 3. Update VECTOR_BUCKET in skill-embeddings.py
+cd skill-search/scripts
+# Edit line 37: VECTOR_BUCKET = "skills-vectors-XXXXXXXXXX"
+
+# 4. Activate virtual environment (if not already active)
+cd /path/to/skill-selector-and-search/skill-search
+source venv/bin/activate
+
+# 5. Run the embeddings generator
+python3 scripts/skill-embeddings.py
+```
+
+##### Deactivating the Environment
+
+When you're done working:
+```bash
+deactivate
+```
+
+### Testing Semantic Search
+
+After generating and uploading skill embeddings, you can test the semantic search capability using the interactive test script.
+
+#### test-skill-embeddings.py
+
+The test script demonstrates semantic search by allowing you to query the vector index with natural language and see ranked results based on conceptual similarity.
+
+**Features:**
+- Interactive search interface with continuous testing
+- Natural language query input or predefined default
+- Configurable number of results (top-k)
+- Detailed result display with similarity scores
+- Qualitative interpretation of match quality
+- Full metadata display (skill ID, title, level, ancestors)
+
+**Usage:**
+
+```bash
+# Ensure virtual environment is activated
+cd skill-search
+source venv/bin/activate
+
+# Run the test script
+python3 scripts/test-skill-embeddings.py
+```
+
+**Interactive Workflow:**
+
+1. **Select Search Option:**
+   - Option 1: Use default query (recommended for first test)
+   - Option 2: Enter custom query
+   - Option 3: Exit
+
+2. **Configure Results:**
+   - Specify number of results to return (default: 5)
+   - Range: 1-100 results
+
+3. **Review Results:**
+   - Each result shows:
+     - Skill ID and title
+     - Skill level (L1-L4 with description)
+     - Similarity score (0-1 scale for cosine similarity)
+     - Match quality indicator (🟢 Excellent, 🔵 Strong, 🟡 Good, 🟠 Moderate, ⚪ Weak)
+     - Parent and ancestor skill IDs
+   - Interpretation section explains the results
+
+4. **Continue Testing:**
+   - After each search, choose to search again or exit
+   - Test different queries to explore semantic matching
+
+**Default Query:**
+
+The default query is designed to match multiple relevant skills across different hierarchy levels:
+
+```
+"We need experienced consultants for a cloud migration project involving 
+containerization, microservices architecture, and infrastructure automation 
+using Kubernetes and Terraform"
+```
+
+**Expected Results:**
+- L1: Technology (broad category match)
+- L2: Cloud Solutions, DevOps (sub-category matches)
+- L3: Cloud Migration Strategy, Container Orchestration, Infrastructure as Code (generic skill matches)
+- L4: Kubernetes, Docker, Terraform, AWS, Azure, Google Cloud (specific technology matches)
+
+**Distance & Similarity Score Interpretation:**
+
+> **Important:** AWS S3 Vectors returns **cosine distance** (not similarity). Lower distance = better match.
+> - **Distance Formula:** `distance = 1 - similarity`
+> - **Conversion:** `similarity = 1 - distance`
+> - **Color Progression:** ⚪ White (Weak) → 🟠 Orange → 🟡 Yellow → 🔵 Blue → 🟢 Green (Excellent)
+
+| Distance Range | Similarity Range | Interpretation | Indicator | Meaning |
+|----------------|------------------|----------------|-----------|---------|
+| 0.00 - 0.15 | 0.85 - 1.00 | Excellent Match | 🟢 | Query terms closely align with skill description and context |
+| 0.16 - 0.30 | 0.70 - 0.84 | Strong Match | 🔵 | High semantic relevance with minor differences |
+| 0.31 - 0.45 | 0.55 - 0.69 | Good Match | 🟡 | Relevant skill with some semantic distance |
+| 0.46 - 0.60 | 0.40 - 0.54 | Moderate Match | 🟠 | Tangentially related or broader conceptual match |
+| 0.61+ | 0.00 - 0.39 | Weak Match | ⚪ | Low relevance, may need query refinement |
+
+**Example Output:**
+
+```
+Result #1
+--------------------------------------------------------------------------------
+  Skill ID:      L4ABC123
+  Title:         Kubernetes
+  Level:         L4 (Technology/Tool)
+  Distance:      0.1235 (lower = better match)
+  Similarity:    0.8765 🟢 (Excellent Match)
+  Parent ID:     L3XYZ456
+  Ancestors:     L1VX34BJ, L2ZG2HTE, L3XYZ456
+
+Result #2
+--------------------------------------------------------------------------------
+  Skill ID:      L3XYZ456
+  Title:         Container Orchestration
+  Level:         L3 (Generic Skill)
+  Distance:      0.1766 (lower = better match)
+  Similarity:    0.8234 🔵 (Strong Match)
+  Parent ID:     L2ZG2HTE
+  Ancestors:     L1VX34BJ, L2ZG2HTE
+```
+
+**Testing Tips:**
+
+1. **Start with the Default Query**: Demonstrates multi-level skill matching
+2. **Try Specific Technologies**: e.g., "Python machine learning frameworks"
+3. **Test Broad Concepts**: e.g., "digital transformation strategy"
+4. **Use Industry Terms**: e.g., "financial risk modeling and compliance"
+5. **Compare Query Variations**: See how different phrasings affect results
+6. **Note Score Patterns**: Higher-level skills (L1, L2) often have lower scores than specific technologies (L4)
+
+**Configuration:**
+
+Key settings in `test-skill-embeddings.py` (should match `skill-embeddings.py`):
+
+```python
+# AWS Profiles
+BEDROCK_PROFILE = "exalm"           # For embedding generation
+S3VECTORS_PROFILE = "troy"          # For vector search
+BEDROCK_REGION = "us-east-1"
+S3VECTORS_REGION = "ap-southeast-2"
+
+# Vector Bucket & Index
+VECTOR_BUCKET = "skills-vectors-<timestamp>"  # Update to match deployment
+VECTOR_INDEX = "skills-index"
+
+# Defaults
+DEFAULT_TOP_K = 5                   # Number of results to return
+```
+
+### Data Files
+
+**skill-embeddings.jsonl** (cached locally, not deployed):
+```jsonl
+{"_metadata": {"last_updated": "2025-10-10T12:34:56Z", "total_skills": 200, ...}}
+{"id": "L1VX34BJ", "level": 1, "title": "Technology", "embedding_text": "...", "vector": [...]}
+{"id": "L2ZG2HTE", "level": 2, "title": "Digital Strategy", "embedding_text": "...", "vector": [...]}
+...
+```
+
+This file serves as both a cache (to avoid re-embedding unchanged skills) and a local backup of all embeddings.
+
 ## Architecture
 
 ### Technology Stack
@@ -369,12 +719,14 @@ Four-level hierarchical structure:
 
 **Backend (Skills Search)**:
 - Python 3.x
-- Vector embedding libraries (TBD)
 - AWS SDK for Python (boto3)
+- AWS Bedrock - Titan Embeddings V2 model
+- AWS S3 Vectors - Vector storage and semantic search
 
 **Infrastructure**:
-- AWS S3 - Static hosting and object storage
-- AWS S3 Vectors - Vector embedding storage
+- AWS S3 - Static website hosting and object storage
+- AWS S3 Vector Buckets - Vector embedding storage and retrieval
+- AWS Bedrock - Embedding generation (Titan V2)
 
 ### Data Flow
 
@@ -386,7 +738,13 @@ Four-level hierarchical structure:
 5. Selections saved to `users/<email>.json` via S3 PUT
 6. `users-master.json` updated with new file reference
 
-**Vector Generation (TODO)**:
+**Vector Generation Flow**:
+1. Administrator runs `skill-embeddings.py` script locally
+2. Script loads `skills-master.json` and flattens hierarchy
+3. Script compares with cached `skill-embeddings.jsonl` to detect changes
+4. For new/changed skills, script calls AWS Bedrock Titan V2 to generate embeddings
+5. Script saves all embeddings to local `skill-embeddings.jsonl` cache
+6. Script uploads all vectors to S3 Vector Index via batch API calls
 
 **Search Flow (TODO)**:
 

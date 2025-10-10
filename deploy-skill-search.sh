@@ -23,116 +23,135 @@ source "$SCRIPT_DIR/scripts/bucket-operations.sh"
 # SKILL SEARCH SPECIFIC FUNCTIONS
 # =============================================================================
 
-# Interactive vector bucket management workflow
-manage_vector_bucket_workflow() {
-    print_header "Vector Bucket Setup"
-    
-    print_status "The vector bucket stores embedded skill vectors for semantic search."
-    echo
-    
-    # List existing vector buckets
-    print_status "Checking for existing $BUCKET_PREFIX_SKILL_VECTORS buckets in region $REGION..."
-    echo
-    
+# Prompt user to reuse existing vector bucket
+prompt_reuse_existing_bucket() {
     local existing_buckets=()
     while IFS= read -r bucket; do
         [ -n "$bucket" ] && existing_buckets+=("$bucket")
     done < <(list_buckets_by_pattern "$BUCKET_PREFIX_SKILL_VECTORS" "vector")
     
     if [ ${#existing_buckets[@]} -eq 0 ]; then
-        print_status "No existing $BUCKET_PREFIX_SKILL_VECTORS buckets found in region $REGION."
-        echo
-    else
-        print_status "Found ${#existing_buckets[@]} existing $BUCKET_PREFIX_SKILL_VECTORS bucket(s):"
-        local index=1
-        for bucket in "${existing_buckets[@]}"; do
-            echo "  [$index] $bucket"
-            ((index++))
-        done
-        echo
-        
-        # Ask if user wants to delete any buckets
-        if prompt_yes_no "Do you want to delete any of these buckets?" "N"; then
-            echo "Enter 'all' to delete all buckets, or bucket number(s) separated by spaces (e.g., '1 3'):"
-            read -r buckets_to_delete
-            
-            local delete_list=()
-            if [ "$buckets_to_delete" = "all" ]; then
-                delete_list=("${existing_buckets[@]}")
-            else
-                # Parse bucket numbers
-                read -ra input_numbers <<< "$buckets_to_delete"
-                for num in "${input_numbers[@]}"; do
-                    if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#existing_buckets[@]}" ]; then
-                        delete_list+=("${existing_buckets[$((num-1))]}")
-                    fi
-                done
-            fi
-            
-            if [ ${#delete_list[@]} -eq 0 ]; then
-                print_warning "No valid buckets selected for deletion."
-            else
-                # Final confirmation
-                echo
-                print_warning "The following vector bucket(s) will be PERMANENTLY DELETED with ALL contents:"
-                for bucket in "${delete_list[@]}"; do
-                    echo "  - $bucket"
-                done
-                echo
-                
-                if prompt_dangerous_confirmation "DELETE" "permanently delete these vector buckets"; then
-                    # Delete each bucket
-                    for bucket in "${delete_list[@]}"; do
-                        delete_vector_bucket "$bucket"
-                        
-                        # Remove from existing_buckets array
-                        existing_buckets=("${existing_buckets[@]/$bucket}")
-                    done
-                    echo
-                fi
-            fi
-        fi
+        # No existing buckets, must create new
+        return 1
     fi
     
-    # Ask if user wants to create a new vector bucket
     echo
-    if ! prompt_yes_no "Do you want to create a new vector bucket?" "Y"; then
-        print_warning "Skipping vector bucket creation."
+    print_status "Found ${#existing_buckets[@]} existing vector bucket(s):"
+    for bucket in "${existing_buckets[@]}"; do
+        echo "  - $bucket"
+    done
+    echo
+    
+    if prompt_yes_no "Do you want to reuse an existing vector bucket?" "N"; then
+        # Let user select which bucket
+        if [ ${#existing_buckets[@]} -eq 1 ]; then
+            BUCKET_NAME_SKILL_VECTORS="${existing_buckets[0]}"
+            print_success "Using existing bucket: $BUCKET_NAME_SKILL_VECTORS"
+        else
+            echo "Select a bucket:"
+            local index=1
+            for bucket in "${existing_buckets[@]}"; do
+                echo "  [$index] $bucket"
+                ((index++))
+            done
+            
+            while true; do
+                read -p "Enter bucket number [1-${#existing_buckets[@]}]: " selection
+                if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#existing_buckets[@]}" ]; then
+                    BUCKET_NAME_SKILL_VECTORS="${existing_buckets[$((selection-1))]}"
+                    print_success "Using existing bucket: $BUCKET_NAME_SKILL_VECTORS"
+                    break
+                else
+                    print_warning "Invalid selection. Please try again."
+                fi
+            done
+        fi
+        return 0
+    else
         return 1
+    fi
+}
+
+# Manage vector index in the bucket
+manage_vector_index() {
+    local bucket_name="$1"
+    
+    print_subheader "Vector Index Configuration"
+    
+    # Check if index exists
+    print_status "Checking for existing vector index..."
+    
+    if vector_index_exists "$bucket_name" "$VECTOR_INDEX_NAME"; then
+        print_status "Found existing vector index: $VECTOR_INDEX_NAME"
+        echo
+        
+        if prompt_yes_no "Do you want to preserve the existing vector index?" "N"; then
+            # Rename with timestamp
+            local timestamp=$(date +%Y%m%d-%H%M%S)
+            local backup_index_name="${VECTOR_INDEX_NAME}-${timestamp}"
+            
+            print_status "Creating timestamped backup index: $backup_index_name"
+            print_warning "Note: The original index '$VECTOR_INDEX_NAME' will remain unchanged."
+            print_status "You will have both indexes: '$VECTOR_INDEX_NAME' (original) and '$backup_index_name' (new)"
+            echo
+            
+            # Create new index with timestamp
+            if create_vector_index "$bucket_name" "$backup_index_name" "$VECTOR_EMBEDDING_DIM" "$VECTOR_DISTANCE_METRIC" "$VECTOR_DATA_TYPE"; then
+                print_success "New timestamped index created alongside the original"
+                echo
+                print_status "Active indexes in bucket:"
+                list_vector_indexes "$bucket_name" | while read -r idx; do
+                    echo "  - $idx"
+                done
+            else
+                print_error "Failed to create timestamped index"
+                return 1
+            fi
+        else
+            # Delete and recreate with same name
+            print_status "Deleting existing vector index..."
+            if delete_vector_index "$bucket_name" "$VECTOR_INDEX_NAME"; then
+                echo
+                print_status "Creating new vector index with same name..."
+                if create_vector_index "$bucket_name" "$VECTOR_INDEX_NAME" "$VECTOR_EMBEDDING_DIM" "$VECTOR_DISTANCE_METRIC" "$VECTOR_DATA_TYPE"; then
+                    print_success "Vector index recreated successfully"
+                else
+                    print_error "Failed to create new vector index"
+                    return 1
+                fi
+            else
+                print_error "Failed to delete existing index"
+                return 1
+            fi
+        fi
+    else
+        print_status "No existing vector index found."
+        echo
+        
+        # Display configuration and confirm
+        print_status "Vector Index Configuration:"
+        echo "  Bucket Name: $bucket_name"
+        echo "  Index Name: $VECTOR_INDEX_NAME"
+        echo "  Data Type: $VECTOR_DATA_TYPE"
+        echo "  Dimension: $VECTOR_EMBEDDING_DIM"
+        echo "  Distance Metric: $VECTOR_DISTANCE_METRIC"
+        echo "  Region: $REGION"
+        echo
+        
+        if prompt_yes_no "Proceed with creating this vector index?" "Y"; then
+            if create_vector_index "$bucket_name" "$VECTOR_INDEX_NAME" "$VECTOR_EMBEDDING_DIM" "$VECTOR_DISTANCE_METRIC" "$VECTOR_DATA_TYPE"; then
+                print_success "Vector index created successfully"
+            else
+                print_error "Failed to create vector index"
+                return 1
+            fi
+        else
+            print_warning "Vector index creation cancelled"
+            return 1
+        fi
     fi
     
     return 0
-}
-
-# Deploy vector bucket
-deploy_vector_bucket() {
-    print_status "Starting vector bucket deployment..."
-    print_status "Vector Bucket Name: $BUCKET_NAME_SKILL_VECTORS"
-    print_status "Region: $REGION"
-    print_status "AWS Profile: $AWS_PROFILE"
-    echo
-    
-    # Create vector bucket
-    if create_bucket "$BUCKET_NAME_SKILL_VECTORS" "vector"; then
-        echo
-        print_success "Vector bucket deployment completed!"
-        print_status "Note: Vector buckets are always encrypted and have Block Public Access enabled by default."
-        print_status "Access control is managed through IAM policies using the 's3vectors' namespace."
-        
-        # List vector buckets to confirm
-        echo
-        print_status "Listing all vector buckets in region $REGION to confirm creation..."
-        if aws s3vectors list-vector-buckets --region "$REGION" --profile "$AWS_PROFILE" 2>&1; then
-            print_success "Vector bucket list retrieved successfully"
-        else
-            print_error "Failed to list vector buckets. Your bucket may still have been created."
-        fi
-        
-        return 0
-    else
-        print_error "Vector bucket deployment failed!"
-        return 1
-    fi
 }
 
 # =============================================================================
@@ -147,27 +166,53 @@ main() {
     check_aws_cli
     check_s3vectors_availability
     
-    # Step 2: Set bucket name
-    BUCKET_NAME_SKILL_VECTORS="$DEFAULT_BUCKET_NAME_SKILL_VECTORS"
+    # Step 2: Check for existing buckets and offer deletion
+    print_subheader "Existing Vector Buckets"
+    delete_buckets_interactive "$BUCKET_PREFIX_SKILL_VECTORS" "vector" "$BUCKET_PREFIX_SKILL_VECTORS"
     
-    # Step 3: Interactive workflow (list, delete, create)
-    if manage_vector_bucket_workflow; then
-        echo
-        
-        # Step 4: Deploy vector bucket
-        if deploy_vector_bucket; then
-            echo
-            print_header "Vector bucket deployment completed successfully!"
-            
-            echo "Vector Bucket Details:"
-            echo "  Name: $BUCKET_NAME_SKILL_VECTORS"
-            echo "  Region: $REGION"
-            echo "  S3 URI: s3://$BUCKET_NAME_SKILL_VECTORS"
-            echo
+    # Step 3: Determine if reusing existing bucket or creating new one
+    local reusing_bucket=0
+    if prompt_reuse_existing_bucket; then
+        reusing_bucket=1
+        print_status "Reusing existing vector bucket: $BUCKET_NAME_SKILL_VECTORS"
+    else
+        # Set new bucket name
+        BUCKET_NAME_SKILL_VECTORS="$DEFAULT_BUCKET_NAME_SKILL_VECTORS"
+        print_status "Will create new vector bucket: $BUCKET_NAME_SKILL_VECTORS"
+    fi
+    
+    echo
+    
+    # Step 4: Create bucket if needed
+    if [ "$reusing_bucket" -eq 0 ]; then
+        if ! create_bucket "$BUCKET_NAME_SKILL_VECTORS" "vector"; then
+            print_error "Failed to create vector bucket"
+            exit 1
         fi
+    fi
+    
+    # Step 5: Manage vector index (create or update)
+    if manage_vector_index "$BUCKET_NAME_SKILL_VECTORS"; then
+        echo
+        print_header "Deployment completed successfully!"
+        
+        echo "Vector Bucket Details:"
+        echo "  Name: $BUCKET_NAME_SKILL_VECTORS"
+        echo "  Region: $REGION"
+        echo "  S3 URI: s3://$BUCKET_NAME_SKILL_VECTORS"
+        echo
+        echo "Vector Index Details:"
+        echo "  Index Name: $VECTOR_INDEX_NAME"
+        echo "  Dimension: $VECTOR_EMBEDDING_DIM"
+        echo "  Distance Metric: $VECTOR_DISTANCE_METRIC"
+        echo
+        print_status "Next steps:"
+        echo "  1. Run skill-embeddings.py to generate and upload skill vectors"
+        echo "  2. Update VECTOR_BUCKET in skill-embeddings.py to: $BUCKET_NAME_SKILL_VECTORS"
+        echo
     else
         echo
-        print_header "No deployments were performed."
+        print_header "Deployment completed with warnings."
         echo
     fi
 }
