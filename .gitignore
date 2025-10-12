@@ -47,6 +47,9 @@ venv.bak/
 .env.*.local
 
 # Project-specific
+skill-embeddings/skill-embeddings.jsonl
+skill-search/backend/data/user_db.json
+skill-search/frontend/src/styles/shared.css
 
 # AWS/Deployment artifacts
 .aws-sam/

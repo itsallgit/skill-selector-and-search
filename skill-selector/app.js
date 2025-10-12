@@ -8,8 +8,8 @@ class SkillsApp {
     constructor() {
         // Configuration (bucket/region overridden by deploy.sh, but also auto-detected for safety)
         const host = window.location.hostname; // e.g. bucket.s3-website-region.amazonaws.com OR bucket.s3.region.amazonaws.com
-        let inferredBucket = 'deloitte-skills-selector';
-        let inferredRegion = 'us-east-1';
+        let inferredBucket = 'skills-selector';
+        let inferredRegion = 'ap-southeast-2';
         const websiteMatch = host.match(/^(.*?)\.s3-website[-.]([a-z0-9-]+)\.amazonaws\.com$/);
         const restMatch = host.match(/^(.*?)\.s3\.([a-z0-9-]+)\.amazonaws\.com$/);
         if (websiteMatch) {

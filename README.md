@@ -1,9 +1,9 @@
 # Skills Selector & Search Platform
 
-This project has two integrated capabilities:
+This project has two integrated applications:
 
 1. **Skills Selector** - Web application for interactive skill selection and management
-2. **Skills Search** - Semantic search backend for finding users by skill expertise
+2. **Skills Search** - Full-stack web application for finding users by skills using natural language queries
 
 > Please note: This is POC project that has deprioritised platform hardening and security in the interest of demonstrating value.
 
@@ -30,10 +30,32 @@ skill-selector/                 # Web application (deployed to S3)
 ├── styles.css                  # Application styles
 └── app.js                      # Core application logic
 
-skill-search/                   # Semantic search backend (not deployed to S3)
-└── scripts/
-    ├── skill-embeddings.py     # Generate and upload skill vector embeddings
-    └── user-skills-search.py   # Semantic search implementation (TBD)
+skill-search/                   # Full-stack semantic search application
+├── backend/                    # FastAPI backend
+│   ├── api/                    # API routes and models
+│   ├── services/               # Business logic (search, scoring, repository)
+│   ├── scripts/                # Utility scripts (ingestion, validation)
+│   ├── data/                   # User database (generated)
+│   ├── config.py               # Configuration management
+│   ├── main.py                 # FastAPI application
+│   └── requirements.txt        # Python dependencies
+├── frontend/                   # React frontend
+│   ├── src/                    # React components and styles
+│   ├── public/                 # Static assets
+│   └── package.json            # Node dependencies
+├── docker-compose.yml          # Multi-container setup
+├── setup.sh                    # One-click setup script
+└── README.md                   # Skills Search documentation
+
+skill-embeddings/               # Skill embedding generation
+├── scripts/
+│   ├── skill-embeddings.py     # Generate and upload skill vector embeddings
+│   ├── test-skill-embeddings.py # Test vector search
+│   └── user-skills-search.py   # Legacy search script
+└── requirements.txt            # Python dependencies
+
+shared/                         # Shared resources
+└── styles.css                  # Common CSS styles (used by both apps)
 
 data/                           # JSON data files (deployed to S3)
 ├── skills-master.json          # Hierarchical skills database
@@ -52,7 +74,6 @@ scripts/                        # Shared deployment utilities
 docs/                           # Documentation
 
 deploy-skill-selector.sh        # Skills Selector application deployment
-deploy-skill-search.sh          # Skills Search infrastructure deployment
 README.md                       # This file
 ```
 
@@ -359,7 +380,7 @@ Four-level hierarchical structure:
 ]
 ```
 
-## Skills Search Backend
+## Skills Embedding Scripts
 
 ### Overview
 
@@ -676,6 +697,166 @@ Result #2
 4. **Use Industry Terms**: e.g., "financial risk modeling and compliance"
 5. **Compare Query Variations**: See how different phrasings affect results
 6. **Note Score Patterns**: Higher-level skills (L1, L2) often have lower scores than specific technologies (L4)
+
+## Skills Search Application
+
+### Overview
+
+The Skills Search Application is a full-stack web application that enables finding users by skills using natural language queries. It builds upon the semantic search backend to provide an intuitive interface for discovering talent based on skill requirements.
+
+### Quick Start
+
+```bash
+cd skill-search
+./setup.sh
+```
+
+The setup script will:
+1. Verify Docker installation
+2. Check AWS credentials
+3. Offer to ingest user data from S3
+4. Build and start Docker containers
+
+Access the application:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+
+### Features
+
+- **Natural Language Search**: Query using conversational phrases like "AWS Lambda and serverless architecture"
+- **Smart Ranking**: Multi-factor scoring algorithm with level weights, rating multipliers, and transfer bonus
+- **Intuitive Results**: Top 5 users always visible, remaining users organized in expandable score buckets
+- **User Profiles**: Click any user to view their complete skill breakdown
+- **Hot Reload**: Docker development environment with live code updates
+
+### Architecture
+
+**Backend (FastAPI)**:
+- RESTful API with automatic OpenAPI documentation
+- Repository pattern for data access (easy DB migration)
+- Vector search integration with AWS Bedrock and S3 Vectors
+- Pydantic-based configuration and validation
+
+**Frontend (React)**:
+- React 18 with React Router for navigation
+- Shared CSS styling with Skills Selector
+- Responsive design for desktop and mobile
+- Real-time search with loading states
+
+**Infrastructure**:
+- Docker Compose for multi-container orchestration
+- Volume mounts for hot reload during development
+- AWS credentials passed through to containers
+- Isolated network for service communication
+
+### Scoring Algorithm
+
+The ranking algorithm considers:
+
+1. **Skill Level Weights**: L3 (core skills) weighted highest at 0.5
+2. **Rating Multipliers**: Exponential (Advanced users at 4.0x)
+3. **Similarity Scores**: From vector search (0-1 scale)
+4. **Transfer Bonus**: Credit for related tech under different categories (capped at 0.15)
+
+See [skill-search/README.md](skill-search/README.md) for detailed algorithm documentation.
+
+### Configuration
+
+All settings are managed via environment variables in `skill-search/backend/.env`:
+
+```bash
+# AWS Configuration
+AWS_PROFILE=exalm
+AWS_BEDROCK_MODEL_ID=amazon.titan-embed-text-v2:0
+AWS_VECTOR_INDEX_NAME=skills-index
+
+# Scoring Weights (customizable)
+LEVEL_WEIGHT_L3=0.5              # Core skills most important
+RATING_MULTIPLIER_3=4.0          # Advanced users at 4x
+TRANSFER_BONUS_PER_TECH=0.02     # 2% per related tech
+TRANSFER_BONUS_CAP=0.15          # Capped at 15%
+
+# Score Buckets
+EXCELLENT_MIN_SCORE=80           # 80-100 points
+STRONG_MIN_SCORE=60              # 60-79 points
+GOOD_MIN_SCORE=40                # 40-59 points
+```
+
+### Data Ingestion
+
+User data is ingested from S3 and consolidated into a local database:
+
+```bash
+# Manual ingestion
+docker-compose run --rm backend python scripts/ingest_users.py
+
+# Specify custom bucket
+docker-compose run --rm backend python scripts/ingest_users.py --bucket skills-selector-custom
+```
+
+The ingestion script:
+1. Connects to S3 using configured AWS profile
+2. Finds latest `skills-selector-*` bucket (or uses specified bucket)
+3. Downloads all `users/*.json` files
+4. Consolidates into `backend/data/user_db.json`
+5. Reports statistics (user count, total skills)
+
+### API Endpoints
+
+- **POST /api/search**: Search for users by skills
+- **GET /api/users/{email}**: Get user details
+- **GET /api/health**: Health check
+- **GET /api/stats**: Application statistics
+- **GET /docs**: Interactive API documentation
+
+### Development
+
+**Backend Development**:
+```bash
+cd skill-search/backend
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn main:app --reload
+```
+
+**Frontend Development**:
+```bash
+cd skill-search/frontend
+npm install
+npm start
+```
+
+**View Logs**:
+```bash
+docker-compose logs -f
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+**Stop Services**:
+```bash
+docker-compose down
+```
+
+### Troubleshooting
+
+**No user database found**:
+- Run `./setup.sh` and answer "yes" to ingestion prompt
+- Or manually: `docker-compose run --rm backend python scripts/ingest_users.py`
+
+**AWS credential errors**:
+- Verify profile: `aws sts get-caller-identity --profile exalm`
+- Configure: `aws configure --profile exalm`
+
+**Blank search results**:
+- Check backend logs: `docker-compose logs backend`
+- Validate AWS setup: `docker-compose run --rm backend python scripts/validate_aws.py`
+
+**Import errors**:
+- Rebuild containers: `docker-compose build`
+
+For more details, see [skill-search/README.md](skill-search/README.md).
 
 **Configuration:**
 
