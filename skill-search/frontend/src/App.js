@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import SearchPage from './components/SearchPage';
 import UserDetail from './components/UserDetail';
-import './styles/main.css';
+import './styles.css';
 
 function App() {
   return (

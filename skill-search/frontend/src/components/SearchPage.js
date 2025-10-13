@@ -49,13 +49,17 @@ function SearchPage() {
   };
   
   return (
-    <div className="container">
-      <header className="header">
-        <h1>Skills Search</h1>
-        <p>Find users by skills using natural language queries</p>
+    <div className="app-wrapper">
+      <header className="header full-bleed">
+        <div className="container">
+          <div className="nav-bar">
+            <h1>Skill Search</h1>
+          </div>
+        </div>
       </header>
       
-      <SearchBar onSearch={handleSearch} loading={loading} />
+      <div className="container">
+        <SearchBar onSearch={handleSearch} loading={loading} />
       
       {error && (
         <div className="error-message">
@@ -77,6 +81,7 @@ function SearchPage() {
           <p className="hint">Example: "AWS Lambda and serverless architecture"</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

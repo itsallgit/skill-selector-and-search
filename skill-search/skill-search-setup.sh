@@ -368,14 +368,110 @@ EOF
 }
 
 ################################################################################
-# Main Setup Flow
+# Check if Configuration Exists
 ################################################################################
-main() {
+check_existing_config() {
+    if [ -f "${SCRIPT_DIR}/backend/.env" ]; then
+        return 0  # Config exists
+    else
+        return 1  # No config
+    fi
+}
+
+################################################################################
+# Show Setup Menu
+################################################################################
+show_setup_menu() {
+    local has_config=$1
+    
     echo ""
     print_status "=========================================="
-    print_status "Skills Search - Interactive Setup"
+    print_status "Skills Search - Setup Options"
     print_status "=========================================="
     echo ""
+    
+    if [ "$has_config" -eq 0 ]; then
+        print_success "✓ Existing configuration detected (backend/.env)"
+        echo ""
+        echo "Select an option:"
+        echo ""
+        echo "  1) Use existing configuration & restart containers"
+        echo "  2) Rebuild containers with code changes (recommended for updates)"
+        echo "  3) Reconfigure from scratch (setup new .env)"
+        echo "  4) Exit"
+        echo ""
+    else
+        print_warning "No existing configuration found"
+        echo ""
+        echo "Select an option:"
+        echo ""
+        echo "  1) Run initial setup & configuration"
+        echo "  2) Exit"
+        echo ""
+    fi
+}
+
+################################################################################
+# Restart Containers
+################################################################################
+restart_containers() {
+    local rebuild="${1:-false}"
+    
+    echo ""
+    if [ "$rebuild" = "true" ]; then
+        print_status "Rebuilding and restarting Docker containers..."
+        echo "  This will:"
+        echo "    - Stop existing containers"
+        echo "    - Rebuild images with latest code changes"
+        echo "    - Start fresh containers"
+        echo ""
+        
+        # Stop containers
+        print_status "Stopping containers..."
+        docker-compose down
+        
+        # Rebuild and start
+        print_status "Rebuilding images..."
+        docker-compose build --no-cache
+        
+        print_status "Starting containers..."
+        docker-compose up -d
+    else
+        print_status "Restarting Docker containers..."
+        echo "  This will restart containers with existing images"
+        echo ""
+        
+        docker-compose restart
+    fi
+    
+    print_success "Containers restarted successfully!"
+    echo ""
+    echo "=========================================="
+    echo "Skills Search is now running:"
+    echo "  - Backend API:  http://localhost:8000"
+    echo "  - Frontend UI:  http://localhost:3000"
+    echo "  - API Docs:     http://localhost:8000/docs"
+    echo "=========================================="
+    echo ""
+    echo "To view logs:"
+    echo "  docker-compose logs -f"
+    echo ""
+    echo "To stop:"
+    echo "  docker-compose down"
+    echo ""
+}
+
+################################################################################
+# Run Initial Configuration
+################################################################################
+run_initial_config() {
+    echo ""
+    print_status "=========================================="
+    print_status "Skills Search - Initial Configuration"
+    print_status "=========================================="
+    echo ""
+    
+    # Step 1: Get available AWS profiles
     
     # Step 1: Get available AWS profiles
     print_status "Step 1: Discovering AWS Profiles..."
@@ -503,8 +599,8 @@ main() {
     start_choice=${start_choice:-y}
     
     if [[ "$start_choice" =~ ^[Yy]$ ]]; then
-        print_status "Starting Docker containers..."
-        docker-compose up -d
+        print_status "Building and starting Docker containers..."
+        docker-compose up --build -d
         
         print_success "Docker containers started successfully!"
         echo ""
@@ -529,6 +625,90 @@ main() {
     fi
     
     print_success "Setup completed successfully!"
+}
+
+################################################################################
+# Main Setup Flow
+################################################################################
+main() {
+    # Check if configuration already exists
+    if check_existing_config; then
+        # Config exists - show menu
+        while true; do
+            show_setup_menu 0
+            
+            local choice=""
+            read -r -p "Enter your choice (1-4): " choice </dev/tty
+            
+            case "$choice" in
+                1)
+                    # Use existing config & restart
+                    restart_containers false
+                    break
+                    ;;
+                2)
+                    # Rebuild containers with code changes
+                    restart_containers true
+                    break
+                    ;;
+                3)
+                    # Reconfigure from scratch
+                    print_warning "This will overwrite your existing configuration"
+                    local confirm=""
+                    read -r -p "Are you sure? (y/n) [n]: " confirm </dev/tty
+                    confirm=${confirm:-n}
+                    
+                    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                        run_initial_config
+                        break
+                    else
+                        echo ""
+                        print_status "Reconfiguration cancelled"
+                    fi
+                    ;;
+                4)
+                    # Exit
+                    echo ""
+                    print_status "Setup cancelled"
+                    exit 0
+                    ;;
+                *)
+                    echo ""
+                    print_warning "Invalid selection. Please choose 1-4."
+                    echo ""
+                    sleep 1
+                    ;;
+            esac
+        done
+    else
+        # No config - show simplified menu
+        while true; do
+            show_setup_menu 1
+            
+            local choice=""
+            read -r -p "Enter your choice (1-2): " choice </dev/tty
+            
+            case "$choice" in
+                1)
+                    # Run initial setup
+                    run_initial_config
+                    break
+                    ;;
+                2)
+                    # Exit
+                    echo ""
+                    print_status "Setup cancelled"
+                    exit 0
+                    ;;
+                *)
+                    echo ""
+                    print_warning "Invalid selection. Please choose 1-2."
+                    echo ""
+                    sleep 1
+                    ;;
+            esac
+        done
+    fi
 }
 
 # Run main function

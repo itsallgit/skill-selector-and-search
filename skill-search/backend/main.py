@@ -4,9 +4,11 @@ Main FastAPI Application Entry Point
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import logging
 import sys
+import os
 
 from api.routes import router
 from services.user_repository import init_repository
@@ -76,6 +78,24 @@ app.add_middleware(
 
 # Include routes
 app.include_router(router)
+
+# Mount static files for data access
+# Check if running in Docker (data mounted at /data) or locally (relative path)
+if os.path.exists('/data'):
+    # Running in Docker with mounted volume
+    data_dir = '/data'
+else:
+    # Running locally - go up from backend/ to skill-search/ to workspace root/ to data/
+    backend_dir = os.path.dirname(__file__)
+    skill_search_dir = os.path.dirname(backend_dir)
+    workspace_root = os.path.dirname(skill_search_dir)
+    data_dir = os.path.join(workspace_root, 'data')
+
+if os.path.exists(data_dir):
+    app.mount("/data", StaticFiles(directory=data_dir), name="data")
+    logger.info(f"Mounted data directory: {data_dir}")
+else:
+    logger.warning(f"Data directory not found: {data_dir}")
 
 
 @app.get("/")
