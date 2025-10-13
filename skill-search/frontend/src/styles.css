@@ -734,13 +734,13 @@ body {
 
 .user-rank {
     font-weight: bold;
-    font-size: 1.2rem;
+    font-size: 2rem;  /* Match score size */
     color: #0078d4;
-    min-width: 40px;
+    min-width: 50px;
 }
 
 .user-name {
-    font-size: 1.1rem;
+    font-size: 1.3rem;  /* Larger font */
     font-weight: 600;
     color: #0078d4;
     text-decoration: none;
@@ -752,7 +752,7 @@ body {
 
 .user-email {
     color: #666;
-    font-size: 0.9rem;
+    font-size: 0.9rem;  /* Keep same size */
 }
 
 .user-score {
@@ -763,8 +763,29 @@ body {
     display: block;
     font-size: 2rem;
     font-weight: bold;
-    color: #28a745;
     line-height: 1;
+    transition: color 0.3s ease;
+}
+
+/* Score color coding */
+.user-score.score-excellent .score-value {
+    color: #28a745;  /* Dark green - 80-100 */
+}
+
+.user-score.score-strong .score-value {
+    color: #5cb85c;  /* Green - 60-79 */
+}
+
+.user-score.score-good .score-value {
+    color: #8bc34a;  /* Yellow-green - 40-59 */
+}
+
+.user-score.score-fair .score-value {
+    color: #ff9800;  /* Orange - 20-39 */
+}
+
+.user-score.score-low .score-value {
+    color: #999;  /* Gray - 0-19 */
 }
 
 .score-label {
@@ -836,6 +857,71 @@ body {
     font-size: 0.7rem;
     color: #666;
     margin-top: 0.25rem;
+}
+
+/* Enhanced skill tag with hierarchy display */
+.skill-tag-enhanced {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    max-width: 400px;
+    gap: 0.5rem;
+}
+
+.skill-tag-enhanced.rating-1 {
+    background: #e8f4fd;
+    border-color: #b3d9f2;
+}
+
+.skill-tag-enhanced.rating-2 {
+    background: #fff3cd;
+    border-color: #ffd700;
+}
+
+.skill-tag-enhanced.rating-3 {
+    background: #d4edda;
+    border-color: #28a745;
+}
+
+.skill-tag-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.skill-tag-hierarchy {
+    font-size: 0.8rem;
+    color: #666;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.skill-tag-enhanced .skill-tag-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0;
+    font-size: 0.75rem;
+}
+
+.skill-level-label {
+    font-weight: 600;
+    color: #555;
+}
+
+.skill-rating-badge {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: #333;
 }
 
 /* =============================================================================

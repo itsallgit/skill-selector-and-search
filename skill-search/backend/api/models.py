@@ -30,6 +30,7 @@ class MatchedSkill(BaseModel):
     parent_titles: List[str] = []
     similarity: float
     color: str
+    rating: Optional[int] = None  # User's rating for this skill (1-3)
 
 
 class UserResult(BaseModel):

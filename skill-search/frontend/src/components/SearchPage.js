@@ -70,7 +70,7 @@ function SearchPage() {
       {results && (
         <div className="results-container">
           <SkillResults skills={results.matched_skills} />
-          <UserResults users={results.top_users} title="Top Matches" />
+          <UserResults users={results.top_users} title="Top Ranked Users" />
           <ScoreBuckets buckets={results.buckets} />
         </div>
       )}

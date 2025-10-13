@@ -5,6 +5,7 @@ API Routes - REST endpoints for the Skills Search application.
 from fastapi import APIRouter, HTTPException, status
 from typing import List, Dict, Any
 import logging
+import json
 
 from api.models import (
     SearchRequest,
@@ -76,9 +77,18 @@ async def search_skills(request: SearchRequest):
         ]
         
         logger.info(f"Found {len(matched_skills)} matching skills")
+        logger.info(f"Matched skill IDs: {[s.skill_id for s in matched_skills[:5]]}")  # Log first 5
         
         # Step 2: Find all users who have any of these skills
         all_users = user_repo.get_all_users()
+        logger.info(f"Total users in database: {len(all_users)}")
+        
+        # Log the structure of the first user to understand the data format
+        if all_users:
+            first_user = all_users[0]
+            logger.info(f"Sample user structure - keys: {list(first_user.keys())}")
+            logger.info(f"Sample user data: {json.dumps(first_user, indent=2)[:500]}")  # First 500 chars
+        
         matched_skill_ids = {s.skill_id for s in matched_skills}
         
         # Build skills lookup for hierarchy info
@@ -89,8 +99,11 @@ async def search_skills(request: SearchRequest):
         for user in all_users:
             # Check if user has any matched skills
             user_skill_ids = {skill.get('skill_id') for skill in user.get('skills', [])}
+            logger.debug(f"Processing user, has {len(user_skill_ids)} skills")
+            
             if not user_skill_ids.intersection(matched_skill_ids):
                 # No matches, but check for transfer bonus eligibility
+                logger.debug(f"User has no direct skill matches")
                 pass  # Let scoring service handle transfer bonus
             
             # Calculate score
@@ -102,25 +115,42 @@ async def search_skills(request: SearchRequest):
             
             # Skip users with zero score
             if score_data['normalized_score'] == 0:
+                logger.debug(f"Skipping user with zero score")
                 continue
             
-            # Build matched skills for this user
-            user_matched_skills = [
-                MatchedSkill(
-                    skill_id=detail['skill_id'],
-                    title=detail['title'],
-                    level=detail['level'],
-                    parent_titles=[],  # Not needed in user results
-                    similarity=detail['similarity'],
-                    color=''  # Will use global match color
+            # Get user email from either field name
+            user_email = user.get('email', user.get('userEmail', 'unknown'))
+            user_name = user.get('name', user_email.split('@')[0])  # Default name from email
+            
+            # Build matched skills for this user with parent titles
+            user_matched_skills = []
+            for detail in score_data['matched_skills_detail']:
+                # Get parent titles from the user's skill data
+                user_skill = next(
+                    (s for s in user.get('skills', []) if s.get('skill_id') == detail['skill_id']),
+                    None
                 )
-                for detail in score_data['matched_skills_detail']
-            ]
+                parent_titles = user_skill.get('parent_titles', []) if user_skill else []
+                
+                user_matched_skills.append(
+                    MatchedSkill(
+                        skill_id=detail['skill_id'],
+                        title=detail['title'],
+                        level=detail['level'],
+                        parent_titles=parent_titles,
+                        similarity=detail['similarity'],
+                        color='',  # Will use global match color
+                        rating=detail.get('rating', 1)  # Include user's rating
+                    )
+                )
+            
+            logger.debug(f"Adding user {user_email} with score {score_data['normalized_score']}")
             
             users_scores.append({
-                'email': user['email'],
-                'name': user['name'],
+                'email': user_email,
+                'name': user_name,
                 'score': score_data['normalized_score'],
+                'normalized_score': score_data['normalized_score'],  # For rank_users function
                 'raw_score': score_data['raw_score'],
                 'matched_skills': user_matched_skills,
                 'transfer_bonus': score_data['transfer_bonus'],
@@ -128,7 +158,8 @@ async def search_skills(request: SearchRequest):
             })
         
         if not users_scores:
-            logger.warning("No users found with matching skills")
+            logger.warning(f"No users found with matching skills out of {len(all_users)} total users")
+            logger.warning(f"Matched skill IDs were: {list(matched_skill_ids)[:10]}")  # Log first 10
             return SearchResponse(
                 matched_skills=matched_skills,
                 top_users=[],

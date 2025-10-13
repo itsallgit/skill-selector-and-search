@@ -16,8 +16,15 @@ function ScoreBuckets({ buckets }) {
   };
   
   return (
-    <section className="section buckets-section">
-      <h2>Additional Matches</h2>
+    <section className="matched-skills-section buckets-section">
+      <div className="section-header-row">
+        <div className="section-header-main">
+          <h2>Additional Matches</h2>
+        </div>
+      </div>
+      <p className="section-summary">
+        Users ranked beyond the top matches, organized by score brackets
+      </p>
       {buckets.map((bucket) => {
         if (bucket.count === 0) {
           return null;

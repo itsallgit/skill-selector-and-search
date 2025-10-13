@@ -69,6 +69,9 @@ with no relevant experience.
 
 from typing import List, Dict, Any, Set, Tuple
 from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ScoringService:
@@ -120,6 +123,9 @@ class ScoringService:
                 'has_transfer_bonus': bool
             }
         """
+        user_email = user.get('userEmail', user.get('email', 'unknown'))
+        logger.debug(f"Calculating score for user: {user_email}")
+        
         raw_score = 0.0
         matched_skills_detail = []
         tech_matches = 0
@@ -127,6 +133,7 @@ class ScoringService:
         
         # Build user skill lookups for efficient matching
         user_skills_map = self._build_user_skills_map(user)
+        logger.debug(f"User {user_email} has skills: {list(user_skills_map.keys())[:10]}")  # Log first 10
         
         # Calculate max possible score (for normalization)
         max_possible = self._calculate_max_possible_score(matched_skills)
@@ -200,7 +207,15 @@ class ScoringService:
         """
         skills_map = {}
         
-        for skill in user.get('skills', []):
+        # Log the user structure to understand what we're working with
+        user_keys = list(user.keys())
+        logger.debug(f"Building skills map for user with keys: {user_keys}")
+        
+        # Handle both 'skills' (processed) and 'selectedSkills' (raw) formats
+        user_skills = user.get('skills', user.get('selectedSkills', []))
+        logger.debug(f"User has {len(user_skills)} skills")
+        
+        for skill in user_skills:
             skill_id = skill.get('skill_id')
             if skill_id:
                 skills_map[skill_id] = {
@@ -210,6 +225,7 @@ class ScoringService:
                     'parent_ids': skill.get('parent_ids', [])
                 }
         
+        logger.debug(f"Built skills map with {len(skills_map)} skills")
         return skills_map
     
     def _calculate_max_possible_score(self, matched_skills: List[Dict[str, Any]]) -> float:

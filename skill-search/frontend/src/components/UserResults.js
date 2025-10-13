@@ -19,9 +19,41 @@ function UserResults({ users, title = "Users" }) {
     return `rating-${rating}`;
   };
   
+  const getLevelLabel = (level) => {
+    const labels = {
+      1: 'L1 Capability',
+      2: 'L2 Capability', 
+      3: 'Generic Skill',
+      4: 'Technology'
+    };
+    return labels[level] || `Level ${level}`;
+  };
+  
+  // Get score color class based on value (0-100 scale)
+  const getScoreColorClass = (score) => {
+    if (score >= 80) return 'score-excellent'; // Dark green
+    if (score >= 60) return 'score-strong';    // Green
+    if (score >= 40) return 'score-good';      // Yellow-green
+    if (score >= 20) return 'score-fair';      // Orange
+    return 'score-low';                         // Gray
+  };
+  
+  // Format parent titles WITHOUT the skill itself at the end (since it's already in the title row)
+  const formatSkillHierarchy = (parentTitles, skillTitle) => {
+    if (!parentTitles || parentTitles.length === 0) {
+      return null; // No hierarchy to show
+    }
+    // Only show parent titles, NOT the skill itself
+    return parentTitles.join(' → ');
+  };
+  
   return (
-    <section className="section">
-      <h2>{title} ({users.length})</h2>
+    <section className="matched-skills-section">
+      <div className="section-header-row">
+        <div className="section-header-main">
+          <h2>{title} ({users.length})</h2>
+        </div>
+      </div>
       <div className="users-list">
         {users.map((user) => (
           <div key={user.email} className="user-card">
@@ -33,7 +65,7 @@ function UserResults({ users, title = "Users" }) {
                 </Link>
                 <span className="user-email">{user.email}</span>
               </div>
-              <div className="user-score">
+              <div className={`user-score ${getScoreColorClass(user.score)}`}>
                 <span className="score-value">{user.score.toFixed(1)}</span>
                 <span className="score-label">Score</span>
               </div>
@@ -50,17 +82,26 @@ function UserResults({ users, title = "Users" }) {
                   )}
                 </p>
                 <div className="skills-tags">
-                  {user.matched_skills.map((skill, index) => (
-                    <span 
-                      key={index} 
-                      className={`skill-tag ${getRatingClass(skill.rating || 1)}`}
-                    >
-                      {skill.title}
-                      <span className="skill-tag-meta">
-                        L{skill.level} · {getRatingLabel(skill.rating || 1)}
-                      </span>
-                    </span>
-                  ))}
+                  {user.matched_skills.map((skill, index) => {
+                    const hierarchy = formatSkillHierarchy(skill.parent_titles, skill.title);
+                    return (
+                      <div 
+                        key={index} 
+                        className={`skill-tag-enhanced ${getRatingClass(skill.rating || 1)}`}
+                      >
+                        <div className="skill-tag-title">{skill.title}</div>
+                        {hierarchy && (
+                          <div className="skill-tag-hierarchy">
+                            {hierarchy}
+                          </div>
+                        )}
+                        <div className="skill-tag-meta">
+                          <span className="skill-level-label">{getLevelLabel(skill.level)}</span>
+                          <span className="skill-rating-badge">{getRatingLabel(skill.rating || 1)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
