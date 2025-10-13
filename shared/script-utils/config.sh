@@ -33,7 +33,7 @@ BUCKET_PREFIX_SKILL_VECTORS="skills-vectors"
 # =============================================================================
 
 # Skill Selector Application - Source directories
-SKILL_SELECTOR_DIR="skill-selector"
+SKILL_SELECTOR_DIR="skill-selector/frontend"
 DATA_DIR="data"
 
 # =============================================================================

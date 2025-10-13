@@ -12,6 +12,11 @@ This script demonstrates semantic search capabilities by:
 
 Usage:
     python3 test-skill-embeddings.py
+
+Configuration:
+    Dynamic configuration values (AWS profiles, regions, bucket) are loaded from
+    skill-embeddings-config.json. Run skill-embeddings-setup.sh first to generate
+    this configuration file.
 """
 
 import json
@@ -21,24 +26,56 @@ import os
 from typing import List, Dict, Any, Optional
 
 # =============================================================================
-# CONFIGURATION - Must match skill-embeddings.py settings
+# LOAD DYNAMIC CONFIGURATION
 # =============================================================================
 
-# AWS Profiles and Regions
-BEDROCK_PROFILE = "exalm"
-BEDROCK_REGION = "us-east-1"
-S3VECTORS_PROFILE = "troy"
-S3VECTORS_REGION = "ap-southeast-2"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(SCRIPT_DIR, "../skill-embeddings-config.json")
 
-# Vector Bucket & Index
-VECTOR_BUCKET = "skills-vectors-1760131105"  # UPDATE THIS to match your deployment
-VECTOR_INDEX = "skills-index"
+# Check if config file exists
+if not os.path.exists(CONFIG_FILE):
+    print("=" * 80)
+    print("ERROR: Configuration file not found")
+    print("=" * 80)
+    print(f"\nThe configuration file does not exist: {CONFIG_FILE}")
+    print("\nPlease run the setup script first:")
+    print("  ./skill-embeddings/skill-embeddings-setup.sh")
+    print("\nOr from the project menu:")
+    print("  Main Menu → Skill Embeddings → Setup & Run Embeddings")
+    print()
+    sys.exit(1)
 
-# Embedding Model Configuration
+# Load configuration
+try:
+    with open(CONFIG_FILE, 'r') as f:
+        config = json.load(f)
+    
+    # Dynamic configuration (set by setup script)
+    BEDROCK_PROFILE = config["bedrock_profile"]
+    BEDROCK_REGION = config["bedrock_region"]
+    S3VECTORS_PROFILE = config["s3vectors_profile"]
+    S3VECTORS_REGION = config["s3vectors_region"]
+    VECTOR_BUCKET = config["vector_bucket"]
+    VECTOR_INDEX = config["vector_index"]
+except Exception as e:
+    print("=" * 80)
+    print("ERROR: Failed to load configuration")
+    print("=" * 80)
+    print(f"\nError reading {CONFIG_FILE}: {e}")
+    print("\nPlease run the setup script to regenerate the configuration:")
+    print("  ./skill-embeddings/skill-embeddings-setup.sh")
+    print()
+    sys.exit(1)
+
+# =============================================================================
+# STATIC CONFIGURATION
+# =============================================================================
+
+# Embedding Model Configuration (static)
 EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
 EMBEDDING_DIM = 1024
 
-# Default Search Parameters
+# Default Search Parameters (static)
 DEFAULT_TOP_K = 5
 DEFAULT_QUERY = (
     "We need experienced consultants for a cloud migration project involving "
@@ -153,22 +190,22 @@ def interpret_similarity(score: float, metric: str = "cosine") -> tuple[str, str
         # AWS returns cosine DISTANCE (lower = better)
         # Convert to similarity for interpretation: similarity = 1 - distance
         similarity = 1 - score
-        
+
         # Interpret based on DISTANCE thresholds (lower = better)
-        # Color progression: White (Weak) → Orange → Yellow → Blue → Green (Excellent)
+        # Color progression: Red (Weak) → Yellow → Blue → Green (Excellent)
         if score <= 0.15:  # similarity >= 0.85
             return "Excellent Match", "🟢", similarity
         elif score <= 0.30:  # similarity >= 0.70
-            return "Strong Match", "�", similarity
+            return "Strong Match", "🔵", similarity
         elif score <= 0.45:  # similarity >= 0.55
-            return "Good Match", "�", similarity
+            return "Good Match", "🟡", similarity
         elif score <= 0.60:  # similarity >= 0.40
-            return "Moderate Match", "�", similarity
+            return "Moderate Match", "🟠", similarity
         else:  # score > 0.60
-            return "Weak Match", "⚪", similarity
+            return "Weak Match", "🔴", similarity
     else:
         # For other metrics, provide generic interpretation
-        return "Match", "🔵", score
+        return "Match", "⚪", score
 
 
 def parse_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:

@@ -9,6 +9,7 @@ AWS Profile Configuration Strategy:
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 from typing import Optional
 
 
@@ -40,7 +41,10 @@ class Settings(BaseSettings):
     # ============================================================================
     vector_aws_profile: Optional[str] = None
     vector_aws_region: Optional[str] = None
-    vector_bucket: str = "skills-vectors-1760131105"
+    vector_bucket: str = Field(
+        default="",
+        description="S3 Vector bucket containing skill embeddings (e.g., 'skills-vectors-XXXXXXXXXX')"
+    )
     vector_index: str = "skills-index"
     
     # ============================================================================
@@ -49,7 +53,10 @@ class Settings(BaseSettings):
     # ============================================================================
     ingestion_aws_profile: Optional[str] = None
     ingestion_aws_region: Optional[str] = None
-    ingestion_bucket: str = "skills-selector-1760061975"
+    ingestion_bucket: str = Field(
+        default="",
+        description="S3 bucket containing user data (e.g., 'skills-selector-XXXXXXXXXX')"
+    )
     
     # CORS Configuration
     cors_origins: str = "http://localhost:3000,http://localhost:8000"
@@ -87,7 +94,8 @@ class Settings(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=False
+        case_sensitive=False,
+        extra='ignore'  # Allow extra fields in .env that aren't defined in Settings
     )
     
     # ============================================================================

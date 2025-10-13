@@ -14,6 +14,11 @@ This script:
 
 Usage:
     python3 skill-embeddings.py
+
+Configuration:
+    Dynamic configuration values (AWS profiles, regions, bucket) are loaded from
+    skill-embeddings-config.json. Run skill-embeddings-setup.sh first to generate
+    this configuration file.
 """
 
 import json
@@ -24,31 +29,61 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
 # =============================================================================
-# CONFIGURATION - Update these values as needed
+# LOAD DYNAMIC CONFIGURATION
 # =============================================================================
 
-# AWS Profiles and Regions
-# NOTE: TODO - Currently using two profiles to handle Bedrock access.
-BEDROCK_PROFILE = "exalm"
-BEDROCK_REGION = "us-east-1"
-S3VECTORS_PROFILE = "troy"
-S3VECTORS_REGION = "ap-southeast-2"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(SCRIPT_DIR, "../skill-embeddings-config.json")
 
-# Vector Bucket & Index
-VECTOR_BUCKET = "skills-vectors-1760131105"  # UPDATE THIS after running deploy-skill-search.sh
-VECTOR_INDEX = "skills-index"
+# Check if config file exists
+if not os.path.exists(CONFIG_FILE):
+    print("=" * 80)
+    print("ERROR: Configuration file not found")
+    print("=" * 80)
+    print(f"\nThe configuration file does not exist: {CONFIG_FILE}")
+    print("\nPlease run the setup script first:")
+    print("  ./skill-embeddings/skill-embeddings-setup.sh")
+    print("\nOr from the project menu:")
+    print("  Main Menu → Skill Embeddings → Setup & Run Embeddings")
+    print()
+    sys.exit(1)
 
-# Embedding Model Configuration
+# Load configuration
+try:
+    with open(CONFIG_FILE, 'r') as f:
+        config = json.load(f)
+    
+    # Dynamic configuration (set by setup script)
+    BEDROCK_PROFILE = config["bedrock_profile"]
+    BEDROCK_REGION = config["bedrock_region"]
+    S3VECTORS_PROFILE = config["s3vectors_profile"]
+    S3VECTORS_REGION = config["s3vectors_region"]
+    VECTOR_BUCKET = config["vector_bucket"]
+    VECTOR_INDEX = config["vector_index"]
+except Exception as e:
+    print("=" * 80)
+    print("ERROR: Failed to load configuration")
+    print("=" * 80)
+    print(f"\nError reading {CONFIG_FILE}: {e}")
+    print("\nPlease run the setup script to regenerate the configuration:")
+    print("  ./skill-embeddings/skill-embeddings-setup.sh")
+    print()
+    sys.exit(1)
+
+# =============================================================================
+# STATIC CONFIGURATION
+# =============================================================================
+
+# Embedding Model Configuration (static)
 EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
 EMBEDDING_DIM = 1024
 DISTANCE_METRIC = "cosine"
 
 # File Paths (relative to script location)
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILLS_MASTER_PATH = os.path.join(SCRIPT_DIR, "../../data/skills-master.json")
 EMBEDDINGS_OUTPUT_PATH = os.path.join(SCRIPT_DIR, "../../data/skill-embeddings.jsonl")
 
-# Processing Configuration
+# Processing Configuration (static)
 EMBEDDING_BATCH_SIZE = 25  # Number of skills to embed per Bedrock API call
 MAX_VECTORS_PER_UPLOAD = 50  # Number of vectors to upload per S3 Vectors API call
 

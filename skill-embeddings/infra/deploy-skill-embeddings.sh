@@ -13,11 +13,11 @@ set -e  # Exit on any error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared utilities
-source "$SCRIPT_DIR/scripts/config.sh"
-source "$SCRIPT_DIR/scripts/logging.sh"
-source "$SCRIPT_DIR/scripts/ui-prompts.sh"
-source "$SCRIPT_DIR/scripts/aws-auth.sh"
-source "$SCRIPT_DIR/scripts/bucket-operations.sh"
+source "$SCRIPT_DIR/../../shared/script-utils/config.sh"
+source "$SCRIPT_DIR/../../shared/script-utils/logging.sh"
+source "$SCRIPT_DIR/../../shared/script-utils/ui-prompts.sh"
+source "$SCRIPT_DIR/../../shared/script-utils/aws-auth.sh"
+source "$SCRIPT_DIR/../../shared/script-utils/bucket-operations.sh"
 
 # =============================================================================
 # SKILL SEARCH SPECIFIC FUNCTIONS

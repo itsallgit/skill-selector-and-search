@@ -209,16 +209,82 @@ delete_standard_bucket() {
 # Delete vector bucket
 delete_vector_bucket() {
     local bucket_name="$1"
-    print_status "Deleting vector bucket: $bucket_name"
+    print_status "Preparing to delete vector bucket: $bucket_name"
     
-    # Attempt to delete the vector bucket directly
-    # Note: If bucket contains indexes, deletion may fail
+    # First, check if bucket has any indexes
+    print_status "Checking for vector indexes in bucket..."
+    local indexes=()
+    while IFS= read -r index; do
+        [ -n "$index" ] && [ "$index" != "None" ] && indexes+=("$index")
+    done < <(list_vector_indexes "$bucket_name")
+    
+    if [ ${#indexes[@]} -gt 0 ]; then
+        echo
+        print_warning "Found ${#indexes[@]} vector index(es) in bucket $bucket_name:"
+        for index in "${indexes[@]}"; do
+            echo "  - $index"
+        done
+        echo
+        
+        print_warning "All indexes must be deleted before the bucket can be removed."
+        if prompt_yes_no "Delete all indexes in this bucket?" "N"; then
+            # Delete each index
+            local failed_indexes=()
+            for index in "${indexes[@]}"; do
+                print_status "Deleting index: $index"
+                if ! delete_vector_index "$bucket_name" "$index"; then
+                    failed_indexes+=("$index")
+                fi
+            done
+            
+            if [ ${#failed_indexes[@]} -gt 0 ]; then
+                echo
+                print_error "Failed to delete the following indexes:"
+                for index in "${failed_indexes[@]}"; do
+                    echo "  - $index"
+                done
+                print_error "Cannot delete bucket $bucket_name until all indexes are removed"
+                return 1
+            fi
+            
+            print_success "All indexes deleted successfully"
+        else
+            print_warning "Bucket deletion cancelled. Indexes must be deleted first."
+            return 1
+        fi
+    fi
+    
+    # Check for regular objects in the bucket (non-index data)
+    print_status "Checking for objects in bucket..."
+    local object_count=$(aws s3 ls "s3://$bucket_name" --profile "$AWS_PROFILE" --recursive 2>/dev/null | wc -l | tr -d ' ')
+    
+    if [ "$object_count" -gt 0 ]; then
+        echo
+        print_warning "Found $object_count object(s) in bucket $bucket_name"
+        
+        if prompt_yes_no "Delete all objects in this bucket?" "N"; then
+            print_status "Deleting all objects from $bucket_name..."
+            if aws s3 rm "s3://$bucket_name" --recursive --profile "$AWS_PROFILE" 2>&1; then
+                print_success "All objects deleted successfully"
+            else
+                print_error "Failed to delete some objects"
+                return 1
+            fi
+        else
+            print_warning "Bucket deletion cancelled. All objects must be deleted first."
+            return 1
+        fi
+    fi
+    
+    # Now attempt to delete the empty vector bucket
+    echo
+    print_status "Deleting vector bucket: $bucket_name"
     if aws s3vectors delete-vector-bucket --vector-bucket-name "$bucket_name" --region "$REGION" --profile "$AWS_PROFILE" 2>/dev/null; then
         print_success "Vector bucket $bucket_name deleted successfully"
         return 0
     else
-        print_error "Failed to delete vector bucket $bucket_name (it may contain indexes or have other issues)"
-        print_status "If bucket contains indexes, delete them manually first"
+        print_error "Failed to delete vector bucket $bucket_name"
+        print_status "The bucket may still have protected resources or require manual intervention"
         return 1
     fi
 }
@@ -288,16 +354,39 @@ delete_buckets_interactive() {
     done
     echo
     
+    if [ "$bucket_type" = "vector" ]; then
+        print_warning "Note: Vector buckets with indexes will require additional confirmations for:"
+        echo "  1. Deletion of all indexes in the bucket"
+        echo "  2. Deletion of all objects in the bucket"
+        echo "  3. Final bucket deletion"
+        echo
+    fi
+    
     if prompt_dangerous_confirmation "DELETE" "permanently delete these buckets"; then
         # Delete each bucket
+        local failed_deletions=()
         for bucket in "${delete_list[@]}"; do
+            echo
+            echo "════════════════════════════════════════════════════════"
             if [ "$bucket_type" = "vector" ]; then
-                delete_vector_bucket "$bucket"
+                delete_vector_bucket "$bucket" || failed_deletions+=("$bucket")
             else
-                delete_standard_bucket "$bucket"
+                delete_standard_bucket "$bucket" || failed_deletions+=("$bucket")
             fi
         done
         echo
+        
+        if [ ${#failed_deletions[@]} -gt 0 ]; then
+            print_error "Failed to delete the following bucket(s):"
+            for bucket in "${failed_deletions[@]}"; do
+                echo "  - $bucket"
+            done
+            return 1
+        else
+            print_success "All selected buckets deleted successfully"
+        fi
+    else
+        print_warning "Bucket deletion cancelled."
     fi
 }
 

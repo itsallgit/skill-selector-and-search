@@ -48,6 +48,7 @@ venv.bak/
 
 # Project-specific
 skill-embeddings/skill-embeddings.jsonl
+skill-embeddings/skill-embeddings-config.json
 skill-search/backend/data/user_db.json
 skill-search/frontend/src/styles/shared.css
 
@@ -72,3 +73,7 @@ desktop.ini
 *.bak
 *.backup
 *~
+README.old.md
+
+# Node modules
+node_modules/
