@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import SearchBar from './SearchBar';
+import IntroScreen from './IntroScreen';
+import TabNavigation from './TabNavigation';
 import SkillResults from './SkillResults';
+import ScoringExplanation from './ScoringExplanation';
 import UserResults from './UserResults';
 import ScoreBuckets from './ScoreBuckets';
 
@@ -8,6 +11,8 @@ function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState(null);
+  const [activeTab, setActiveTab] = useState('users'); // Default to "Ranked Users"
+  const [hasSearched, setHasSearched] = useState(false); // Track if search has been performed
   
   const handleSearch = async (query) => {
     if (!query.trim()) {
@@ -18,6 +23,7 @@ function SearchPage() {
     setLoading(true);
     setError(null);
     setResults(null);
+    setActiveTab('users'); // Reset to users tab on new search
     
     try {
       const response = await fetch('/api/search', {
@@ -39,6 +45,7 @@ function SearchPage() {
       
       const data = await response.json();
       setResults(data);
+      setHasSearched(true); // Mark that search has been performed
       
     } catch (err) {
       console.error('Search error:', err);
@@ -46,6 +53,10 @@ function SearchPage() {
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
   };
   
   return (
@@ -59,28 +70,54 @@ function SearchPage() {
       </header>
       
       <div className="container">
-        <SearchBar onSearch={handleSearch} loading={loading} />
-      
-      {error && (
-        <div className="error-message">
-          <p>⚠️ {error}</p>
+        {/* Search Bar - centered when no results, top when results shown */}
+        <div className={`search-container ${hasSearched && results ? 'has-results' : 'centered'}`}>
+          <SearchBar onSearch={handleSearch} loading={loading} />
         </div>
-      )}
+        
+        {/* Intro Screen - only shown when no search has been performed */}
+        {!hasSearched && !loading && !error && (
+          <IntroScreen />
+        )}
       
-      {results && (
-        <div className="results-container">
-          <SkillResults skills={results.matched_skills} />
-          <UserResults users={results.top_users} title="Top Ranked Users" />
-          <ScoreBuckets buckets={results.buckets} />
-        </div>
-      )}
+        {/* Error Message */}
+        {error && (
+          <div className="error-message">
+            <p>⚠️ {error}</p>
+          </div>
+        )}
       
-      {!loading && !error && !results && (
-        <div className="empty-state">
-          <p>Enter a search query to find users with matching skills</p>
-          <p className="hint">Example: "AWS Lambda and serverless architecture"</p>
-        </div>
-      )}
+        {/* Results with Tab Navigation */}
+        {results && (
+          <>
+            {/* Tab Navigation - sticky on desktop */}
+            <TabNavigation
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              skillCount={results.matched_skills?.length || 0}
+              userCount={results.top_users?.length || 0}
+            />
+            
+            {/* Tab Content */}
+            <div className="tab-content">
+              {/* Skills & Scoring Tab */}
+              {activeTab === 'skills' && (
+                <div className="skills-scoring-tab">
+                  <SkillResults skills={results.matched_skills} />
+                  <ScoringExplanation />
+                </div>
+              )}
+              
+              {/* Ranked Users Tab */}
+              {activeTab === 'users' && (
+                <div className="users-tab">
+                  <UserResults users={results.top_users} title="Top Ranked Users" />
+                  <ScoreBuckets buckets={results.buckets} />
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

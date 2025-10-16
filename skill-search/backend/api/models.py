@@ -33,6 +33,40 @@ class MatchedSkill(BaseModel):
     rating: Optional[int] = None  # User's rating for this skill (1-3)
 
 
+class SkillContribution(BaseModel):
+    """Model for individual skill contribution to user score."""
+    skill_id: str
+    title: str
+    level: int
+    rating: int
+    similarity: float
+    points_contributed: float  # How many points this skill added to total score
+    percentage_of_total: float  # What % of user's total score this represents
+    match_type: str  # 'direct' or other types
+
+
+class TransferBonusDetail(BaseModel):
+    """Model for transfer bonus details."""
+    source_skill_id: str
+    source_skill_title: str
+    source_parent_title: str  # The L3 parent the user has this under
+    matched_skill_id: str
+    matched_skill_title: str
+    matched_parent_title: str  # The L3 parent from the query match
+    bonus_amount: float
+
+
+class ScoreBreakdown(BaseModel):
+    """Model for detailed score breakdown for a user."""
+    raw_score: float
+    normalized_score: float
+    total_matched_skills: int
+    skill_contributions: List[SkillContribution]  # Top contributors (80% of score)
+    transfer_bonus_total: float
+    transfer_bonus_details: List[TransferBonusDetail] = []
+    score_interpretation: str  # e.g., "Excellent Match", "Strong Match"
+
+
 class UserResult(BaseModel):
     """Model for a user search result."""
     email: str
@@ -41,6 +75,7 @@ class UserResult(BaseModel):
     score: float  # Normalized 0-100
     matched_skills: List[MatchedSkill]
     transfer_bonus: float
+    score_breakdown: Optional[ScoreBreakdown] = None  # Detailed breakdown for modal
 
 
 class ScoreBucket(BaseModel):

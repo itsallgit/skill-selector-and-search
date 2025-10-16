@@ -130,6 +130,7 @@ class ScoringService:
         matched_skills_detail = []
         tech_matches = 0
         transfer_bonus_amount = 0.0
+        transfer_bonus_details = []  # Track details for modal
         
         # Build user skill lookups for efficient matching
         user_skills_map = self._build_user_skills_map(user)
@@ -174,12 +175,15 @@ class ScoringService:
                     tech_matches += 1
         
         # Calculate transfer bonus
-        transfer_bonus_amount = self._calculate_transfer_bonus(
+        transfer_bonus_result = self._calculate_transfer_bonus(
             user,
             matched_skills,
             user_skills_map,
             skills_lookup
         )
+        
+        transfer_bonus_amount = transfer_bonus_result['bonus']
+        transfer_bonus_details = transfer_bonus_result['details']
         
         raw_score += transfer_bonus_amount
         
@@ -195,7 +199,8 @@ class ScoringService:
             'matched_skills_detail': matched_skills_detail,
             'tech_matches': tech_matches,
             'transfer_bonus': round(transfer_bonus_amount, 4),
-            'has_transfer_bonus': transfer_bonus_amount > 0
+            'has_transfer_bonus': transfer_bonus_amount > 0,
+            'transfer_bonus_details': transfer_bonus_details
         }
     
     def _build_user_skills_map(self, user: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
@@ -249,7 +254,7 @@ class ScoringService:
         matched_skills: List[Dict[str, Any]],
         user_skills_map: Dict[str, Dict[str, Any]],
         skills_lookup: Dict[str, Dict[str, Any]]
-    ) -> float:
+    ) -> Dict[str, Any]:
         """
         Calculate transfer bonus for users with relevant tech under different L3.
         
@@ -264,9 +269,10 @@ class ScoringService:
             → User gets transfer bonus for AWS experience
         
         Returns:
-            Transfer bonus amount (capped)
+            Dictionary with 'bonus' (float) and 'details' (List[Dict])
         """
         transfer_count = 0
+        transfer_details = []
         
         # Get L3 skills from matched results
         matched_l3_skills = [s for s in matched_skills if s['level'] == 3]
@@ -300,6 +306,18 @@ class ScoringService:
                     # If user has this tech under a different L3, give transfer credit
                     if user_l3_parent and user_l3_parent != matched_l3_id:
                         transfer_count += 1
+                        
+                        # Track details for modal
+                        user_l3_parent_data = skills_lookup.get(user_l3_parent, {})
+                        transfer_details.append({
+                            'source_skill_id': l4_child_id,
+                            'source_skill_title': user_skill.get('title', ''),
+                            'source_parent_title': user_l3_parent_data.get('title', 'Unknown'),
+                            'matched_skill_id': l4_child_id,
+                            'matched_skill_title': user_skill.get('title', ''),
+                            'matched_parent_title': matched_l3['title'],
+                            'bonus_amount': self.transfer_bonus_per_tech
+                        })
         
         # Calculate bonus (per tech, capped)
         bonus = min(
@@ -307,7 +325,10 @@ class ScoringService:
             self.transfer_bonus_cap
         )
         
-        return bonus
+        return {
+            'bonus': bonus,
+            'details': transfer_details
+        }
     
     def _get_l4_children(
         self,
@@ -353,6 +374,83 @@ class ScoringService:
             user['rank'] = i
         
         return sorted_users
+    
+    def generate_score_breakdown(
+        self,
+        score_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Generate detailed score breakdown for modal display.
+        Shows top skills representing 80% of total score.
+        
+        Args:
+            score_data: Full score data from calculate_user_score
+            
+        Returns:
+            Dictionary with formatted breakdown for frontend
+        """
+        matched_skills_detail = score_data.get('matched_skills_detail', [])
+        raw_score = score_data.get('raw_score', 0.0)
+        normalized_score = score_data.get('normalized_score', 0.0)
+        transfer_bonus = score_data.get('transfer_bonus', 0.0)
+        transfer_bonus_details = score_data.get('transfer_bonus_details', [])
+        
+        # Sort skills by contribution (descending)
+        sorted_skills = sorted(
+            matched_skills_detail,
+            key=lambda x: x.get('skill_score', 0),
+            reverse=True
+        )
+        
+        # Calculate cumulative contribution to find 80% threshold
+        total_skill_score = sum(s.get('skill_score', 0) for s in sorted_skills)
+        threshold = total_skill_score * 0.8
+        cumulative = 0.0
+        top_contributors = []
+        
+        for skill in sorted_skills:
+            skill_score = skill.get('skill_score', 0)
+            cumulative += skill_score
+            
+            # Calculate percentage of total score
+            percentage = (skill_score / raw_score * 100) if raw_score > 0 else 0
+            
+            top_contributors.append({
+                'skill_id': skill.get('skill_id'),
+                'title': skill.get('title'),
+                'level': skill.get('level'),
+                'rating': skill.get('rating'),
+                'similarity': skill.get('similarity'),
+                'points_contributed': round(skill_score, 2),
+                'percentage_of_total': round(percentage, 1),
+                'match_type': skill.get('match_type', 'direct')
+            })
+            
+            # Stop when we've reached 80% (but ensure at least 3 skills if available)
+            if cumulative >= threshold and len(top_contributors) >= 3:
+                break
+        
+        # Determine score interpretation
+        if normalized_score >= 80:
+            interpretation = "Excellent Match"
+        elif normalized_score >= 60:
+            interpretation = "Strong Match"
+        elif normalized_score >= 40:
+            interpretation = "Good Match"
+        elif normalized_score >= 20:
+            interpretation = "Fair Match"
+        else:
+            interpretation = "Weak Match"
+        
+        return {
+            'raw_score': round(raw_score, 2),
+            'normalized_score': round(normalized_score, 2),
+            'total_matched_skills': len(matched_skills_detail),
+            'skill_contributions': top_contributors,
+            'transfer_bonus_total': round(transfer_bonus, 2),
+            'transfer_bonus_details': transfer_bonus_details,
+            'score_interpretation': interpretation
+        }
 
 
 # Singleton instance

@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FiInfo } from 'react-icons/fi';
+import ScoreBreakdownModal from './ScoreBreakdownModal';
 
 function UserResults({ users, title = "Users" }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  
   if (!users || users.length === 0) {
     return null;
   }
+  
+  const handleScoreClick = (user) => {
+    setSelectedUser(user);
+    setModalOpen(true);
+  };
+  
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedUser(null);
+  };
   
   const getRatingLabel = (rating) => {
     const labels = {
@@ -66,8 +81,20 @@ function UserResults({ users, title = "Users" }) {
                 <span className="user-email">{user.email}</span>
               </div>
               <div className={`user-score ${getScoreColorClass(user.score)}`}>
-                <span className="score-value">{user.score.toFixed(1)}</span>
-                <span className="score-label">Score</span>
+                <div className="score-display">
+                  <span className="score-value">{user.score.toFixed(1)}</span>
+                  <span className="score-label">Score</span>
+                </div>
+                {user.score_breakdown && (
+                  <button 
+                    className="score-info-button"
+                    onClick={() => handleScoreClick(user)}
+                    aria-label="View score breakdown"
+                    title="View detailed score breakdown"
+                  >
+                    <FiInfo />
+                  </button>
+                )}
               </div>
             </div>
             
@@ -108,6 +135,14 @@ function UserResults({ users, title = "Users" }) {
           </div>
         ))}
       </div>
+      
+      {/* Score Breakdown Modal */}
+      <ScoreBreakdownModal
+        isOpen={modalOpen}
+        onClose={handleCloseModal}
+        userName={selectedUser?.name}
+        scoreBreakdown={selectedUser?.score_breakdown}
+      />
     </section>
   );
 }

@@ -146,6 +146,9 @@ async def search_skills(request: SearchRequest):
             
             logger.debug(f"Adding user {user_email} with score {score_data['normalized_score']}")
             
+            # Generate score breakdown for modal (will be included in response)
+            score_breakdown = scoring_service.generate_score_breakdown(score_data)
+            
             users_scores.append({
                 'email': user_email,
                 'name': user_name,
@@ -154,7 +157,8 @@ async def search_skills(request: SearchRequest):
                 'raw_score': score_data['raw_score'],
                 'matched_skills': user_matched_skills,
                 'transfer_bonus': score_data['transfer_bonus'],
-                'has_transfer_bonus': score_data['has_transfer_bonus']
+                'has_transfer_bonus': score_data['has_transfer_bonus'],
+                'score_breakdown': score_breakdown  # Add breakdown data
             })
         
         if not users_scores:
@@ -178,7 +182,8 @@ async def search_skills(request: SearchRequest):
                 rank=u['rank'],
                 score=u['score'],
                 matched_skills=u['matched_skills'],
-                transfer_bonus=u['transfer_bonus']
+                transfer_bonus=u['transfer_bonus'],
+                score_breakdown=u.get('score_breakdown')  # Include breakdown
             )
             for u in ranked_users[:request.top_n_users]
         ]
