@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 function SkillResults({ skills }) {
-  const [isExpanded, setIsExpanded] = useState(true);
   const [skillsData, setSkillsData] = useState(null);
   const [levelFilters, setLevelFilters] = useState({
     1: true,
@@ -150,22 +149,13 @@ function SkillResults({ skills }) {
     <section className="matched-skills-section">
       <div className="section-header-row">
         <div className="section-header-main">
-          <h2>Matched Skills ({filteredSkills.length})</h2>
-          <button 
-            className="collapse-toggle"
-            onClick={() => setIsExpanded(!isExpanded)}
-            aria-label={isExpanded ? "Collapse matched skills" : "Expand matched skills"}
-          >
-            {isExpanded ? '▼' : '▶'}
-          </button>
+          <h2>Matched Skills</h2>
         </div>
       </div>
       <p className="section-summary"></p>
 
-      {isExpanded && (
-        <>
-          {/* Legend */}
-          <div className="similarity-legend">
+      {/* Legend */}
+      <div className="similarity-legend">
             <span className="legend-label">Match Quality:</span>
             <div className="legend-items">
               <div className="legend-item">
@@ -280,8 +270,6 @@ function SkillResults({ skills }) {
               </div>
             );
           })}
-        </>
-      )}
     </section>
   );
 }

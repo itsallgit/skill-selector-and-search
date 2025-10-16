@@ -13,6 +13,7 @@ function SearchPage() {
   const [results, setResults] = useState(null);
   const [activeTab, setActiveTab] = useState('users'); // Default to "Ranked Users"
   const [hasSearched, setHasSearched] = useState(false); // Track if search has been performed
+  const [currentQuery, setCurrentQuery] = useState(''); // Track the current search query
   
   const handleSearch = async (query) => {
     if (!query.trim()) {
@@ -24,6 +25,7 @@ function SearchPage() {
     setError(null);
     setResults(null);
     setActiveTab('users'); // Reset to users tab on new search
+    setCurrentQuery(query); // Store the current query
     
     try {
       const response = await fetch('/api/search', {
@@ -55,6 +57,15 @@ function SearchPage() {
     }
   };
   
+  const handleNewSearch = () => {
+    // Clear everything and return to intro screen
+    setHasSearched(false);
+    setResults(null);
+    setError(null);
+    setCurrentQuery('');
+    setActiveTab('users');
+  };
+  
   const handleTabChange = (tab) => {
     setActiveTab(tab);
   };
@@ -75,10 +86,20 @@ function SearchPage() {
           <IntroScreen onSearch={handleSearch} loading={loading} />
         )}
         
-        {/* Search Bar - shown at top after first search */}
+        {/* Query Display and New Search Button - shown at top after first search */}
         {hasSearched && (
-          <div className="search-container has-results">
-            <SearchBar onSearch={handleSearch} loading={loading} />
+          <div className="search-results-header">
+            <div className="query-display">
+              <span className="query-label">Search Query:</span>
+              <p className="query-text">{currentQuery}</p>
+            </div>
+            <button 
+              onClick={handleNewSearch}
+              disabled={loading}
+              className="btn btn-primary new-search-button"
+            >
+              New Search
+            </button>
           </div>
         )}
       

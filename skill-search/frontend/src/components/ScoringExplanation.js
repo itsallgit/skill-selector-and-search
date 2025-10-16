@@ -5,14 +5,14 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
  * ScoringExplanation - Expandable accordion explaining the scoring algorithm
  * 
  * Features:
- * - Collapsed by default with clear expand indicator
+ * - Expanded by default to show scoring details immediately
  * - Visual formula presentation
  * - Score interpretation guide (ranges + distribution + guidance)
  * - Non-interactive visual elements
  * - Professional, digestible content
  */
 function ScoringExplanation() {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   return (
     <div className="scoring-explanation">

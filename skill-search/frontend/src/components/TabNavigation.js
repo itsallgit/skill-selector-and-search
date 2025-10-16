@@ -24,9 +24,11 @@ function TabNavigation({ activeTab, onTabChange, skillCount = 0, userCount = 0 }
   useEffect(() => {
     const activeTabElement = tabRefs.current[activeTab];
     if (activeTabElement) {
+      // Account for the 4px padding and gap in the container
+      const containerPadding = 4;
       setSelectorStyle({
         width: activeTabElement.offsetWidth,
-        transform: `translateX(${activeTabElement.offsetLeft}px)`
+        transform: `translateX(${activeTabElement.offsetLeft - containerPadding}px)`
       });
     }
   }, [activeTab]);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { FiSearch, FiZap, FiUsers } from 'react-icons/fi';
 
 /**
@@ -7,18 +7,43 @@ import { FiSearch, FiZap, FiUsers } from 'react-icons/fi';
  * Features:
  * - Professional tagline above centered search
  * - Visual flow with line icons: Search → Skills → Users
- * - Search bar integrated below flow
+ * - Search bar integrated below flow with textarea for multi-line support
  * - Transparent green icon backgrounds
  * - Clean, minimal design with professional aesthetic
  * - Hidden once search results appear
+ * - Auto-focuses search input when component mounts
  */
 function IntroScreen({ onSearch, loading }) {
   const [query, setQuery] = React.useState('');
+  const textareaRef = useRef(null);
+  
+  // Auto-focus the search input when component mounts
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, []); // Empty dependency array means this runs once on mount
+  
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [query]);
   
   const handleSubmit = (e) => {
     e.preventDefault();
     if (query.trim()) {
       onSearch(query);
+    }
+  };
+  
+  const handleKeyDown = (e) => {
+    // Submit on Enter, allow Shift+Enter for new lines
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
     }
   };
 
@@ -66,13 +91,15 @@ function IntroScreen({ onSearch, loading }) {
 
         {/* Integrated Search Bar */}
         <form onSubmit={handleSubmit} className="intro-search-form">
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Enter role description or required skills..."
             disabled={loading}
-            className="intro-search-input"
+            className="intro-search-input intro-search-textarea"
+            rows={1}
           />
           <button 
             type="submit" 
