@@ -44,22 +44,25 @@ function UserResults({ users, title = "Users" }) {
     return labels[level] || `Level ${level}`;
   };
   
-  // Get score color class based on value (0-100 scale)
-  const getScoreColorClass = (score) => {
-    if (score >= 80) return 'score-excellent'; // Dark green
-    if (score >= 60) return 'score-strong';    // Green
-    if (score >= 40) return 'score-good';      // Yellow-green
-    if (score >= 20) return 'score-fair';      // Orange
-    return 'score-low';                         // Gray
+  // Get score color class based on display score value (0-100 scale)
+  const getScoreColorClass = (displayScore) => {
+    if (displayScore >= 80) return 'score-excellent'; // Dark green
+    if (displayScore >= 60) return 'score-strong';    // Green
+    if (displayScore >= 40) return 'score-good';      // Yellow-green
+    if (displayScore >= 20) return 'score-fair';      // Orange
+    return 'score-low';                                // Gray
   };
   
-  // Get score interpretation text
-  const getScoreInterpretation = (score) => {
-    if (score >= 80) return 'Excellent Match';
-    if (score >= 60) return 'Strong Match';
-    if (score >= 40) return 'Good Match';
-    if (score >= 20) return 'Fair Match';
-    return 'Weak Match';
+  // Get expertise color class
+  const getExpertiseColorClass = (expertiseLabel) => {
+    const labelMap = {
+      'Expert': 'expertise-expert',
+      'Advanced': 'expertise-advanced',
+      'Intermediate': 'expertise-intermediate',
+      'Early Career': 'expertise-early',
+      'Beginner': 'expertise-beginner'
+    };
+    return labelMap[expertiseLabel] || 'expertise-beginner';
   };
   
   // Format parent titles WITHOUT the skill itself at the end (since it's already in the title row)
@@ -89,10 +92,21 @@ function UserResults({ users, title = "Users" }) {
                 </Link>
                 <span className="user-email">{user.email}</span>
               </div>
-              <div className={`user-score ${getScoreColorClass(user.score)}`}>
-                <div className="score-display">
-                  <span className="score-value">{user.score.toFixed(1)}</span>
-                  <span className="score-label">{getScoreInterpretation(user.score)}</span>
+              <div className={`user-score-two-dimensional ${getScoreColorClass(user.display_score)}`}>
+                {/* PRIMARY: Coverage and Expertise */}
+                <div className="score-dimensions">
+                  <div className="dimension-item">
+                    <span className="dimension-label">Coverage</span>
+                    <span className="dimension-value">{user.coverage_percentage?.toFixed(1) || '0.0'}%</span>
+                  </div>
+                  <div className={`dimension-item ${getExpertiseColorClass(user.expertise_label)}`}>
+                    <span className="dimension-label">Expertise</span>
+                    <span className="dimension-value">{user.expertise_label || 'Unknown'}</span>
+                  </div>
+                </div>
+                {/* SECONDARY: Display Score */}
+                <div className="score-display-secondary">
+                  <span className="score-value-small">{user.display_score?.toFixed(1) || '0.0'}</span>
                 </div>
                 {user.score_breakdown && (
                   <button 
@@ -111,11 +125,6 @@ function UserResults({ users, title = "Users" }) {
               <div className="user-skills">
                 <p className="skills-header">
                   Matched Skills ({user.matched_skills.length})
-                  {user.transfer_bonus > 0 && (
-                    <span className="transfer-bonus" title="Transfer bonus for related technologies">
-                      +{(user.transfer_bonus * 100).toFixed(1)}% transfer
-                    </span>
-                  )}
                 </p>
                 <div className="skills-tags">
                   {user.matched_skills.map((skill, index) => {

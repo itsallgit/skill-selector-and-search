@@ -1708,15 +1708,15 @@ body {
 }
 
 .multiplier-badge.beginner {
-    background-color: #86bc25;
+    background-color: #b3d9f2;
 }
 
 .multiplier-badge.intermediate {
-    background-color: #0076a8;
+    background-color: #ffd700;
 }
 
 .multiplier-badge.advanced {
-    background-color: #c4d600;
+    background-color: #28a745;
 }
 
 .multiplier-label {

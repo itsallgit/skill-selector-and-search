@@ -1,102 +1,29 @@
 """
-Scoring Service - Implements the user ranking algorithm.
+Scoring Service - Two-Dimensional User Ranking Algorithm
 
-SCORING ALGORITHM DOCUMENTATION
-================================
+This module implements a two-dimensional scoring system that evaluates users based on:
+1. COVERAGE: How many relevant skills the user possesses (weighted by similarity)
+2. EXPERTISE: The proficiency level of the user's matched skills (rating-based)
 
-The scoring algorithm ranks users based on their skill alignment with search query results.
-It considers multiple factors to produce a fair, weighted score.
-
-Components:
------------
-1. **Skill Level Weights** - How much each hierarchy level contributes
-   - L1 (Categories): 0.1 - Very broad, minimal weight
-   - L2 (Sub-categories): 0.2 - Broader context
-   - L3 (Generic Skills): 0.5 - MOST IMPORTANT - Core competencies
-   - L4 (Technologies): 0.3 - Specific tools/tech
-
-2. **User Rating Multipliers** - User's self-assessed proficiency (EXPONENTIAL)
-   - Beginner (1): 1.0x
-   - Intermediate (2): 2.0x  
-   - Advanced (3): 4.0x
-   
-   Rationale: Advanced users with relevant L3 skills should rank higher than
-   Intermediate users even if the latter have more specific L4 tool matches.
-
-3. **Similarity Score** - From vector search (0-1 scale)
-   - Derived from cosine distance: similarity = 1 - distance
-   - Measures how semantically close the skill is to the query
-
-4. **Transfer Bonus** - Credit for related technology experience
-   - If query matches an L3 skill, but user only has the L4 technology
-     under a DIFFERENT L3, they get partial credit
-   - Example: Query matches "Serverless Architecture (L3) > AWS (L4)"
-              User has "Cloud Security (L3) > AWS (L4)" 
-              → User gets transfer bonus for AWS competence
-   - Bonus: 0.02 per transferable technology, capped at 0.15 (15%)
-   - Ensures users with relevant tech but different context aren't overlooked
-
-Scoring Formula:
-----------------
-For each matched skill:
-    
-    base_score = similarity × level_weight × rating_multiplier
-    
-User total score:
-    
-    raw_score = Σ(base_score for all matched skills) + transfer_bonus
-    normalized_score = (raw_score / max_possible_score) × 100
-
-Ranking Order (Example):
-------------------------
-Query: "Container Orchestration (L3) + Kubernetes (L4)"
-
-1. User C: Has Kubernetes (L4) under Container Orchestration (L3)
-   → Direct L3 + L4 match = HIGHEST score
-
-2. User B: Has Docker (L4) under Container Orchestration (L3)
-   → Direct L3 match + different L4 = HIGH score
-
-3. User A: Has Kubernetes (L4) under DevOps (different L3)
-   → No L3 match, but gets transfer bonus = MEDIUM score
-   → Ranks above users with NO relevant skills
-
-The transfer bonus prevents User A from outranking Users B or C
-(who have actual L3 matches), while ensuring they rank above users
-with no relevant experience.
-
+The algorithm trusts the vector search's similarity scores and uses them to naturally
+weight skill importance without arbitrary thresholds or complex normalization.
 """
 
-from typing import List, Dict, Any, Set, Tuple
-from config import settings
+from typing import List, Dict, Any
+from scoring_algorithm import scoring_config
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class ScoringService:
-    """Service for scoring and ranking users based on matched skills."""
+    """Service for scoring and ranking users using two-dimensional algorithm."""
     
     def __init__(self):
-        """Initialize scoring configuration from settings."""
-        # Level weights
-        self.level_weights = {
-            1: settings.level_weight_l1,
-            2: settings.level_weight_l2,
-            3: settings.level_weight_l3,
-            4: settings.level_weight_l4,
-        }
-        
-        # Rating multipliers (exponential)
-        self.rating_multipliers = {
-            1: settings.rating_multiplier_1,
-            2: settings.rating_multiplier_2,
-            3: settings.rating_multiplier_3,
-        }
-        
-        # Transfer bonus configuration
-        self.transfer_bonus_per_tech = settings.transfer_bonus_per_tech
-        self.transfer_bonus_cap = settings.transfer_bonus_cap
+        """Initialize scoring service with configured parameters."""
+        self.rating_multipliers = scoring_config.get_rating_multipliers()
+        self.similarity_exponent = scoring_config.SIMILARITY_EXPONENT
+        logger.info(f"Scoring service initialized with rating multipliers: {self.rating_multipliers}")
     
     def calculate_user_score(
         self,
@@ -105,130 +32,111 @@ class ScoringService:
         skills_lookup: Dict[str, Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Calculate comprehensive score for a user against matched skills.
+        Calculate two-dimensional score for a user against matched skills.
         
         Args:
             user: User object with skills data
-            matched_skills: List of skills from vector search
+            matched_skills: List of skills from vector search with similarity scores
             skills_lookup: Full skills lookup table for hierarchy info
             
         Returns:
-            Dictionary with score breakdown:
-            {
-                'raw_score': float,
-                'normalized_score': float (0-100),
-                'matched_skills_detail': List[Dict],
-                'tech_matches': int,
-                'transfer_bonus': float,
-                'has_transfer_bonus': bool
-            }
+            Dictionary with comprehensive score breakdown
         """
         user_email = user.get('userEmail', user.get('email', 'unknown'))
         logger.debug(f"Calculating score for user: {user_email}")
         
-        raw_score = 0.0
-        matched_skills_detail = []
-        tech_matches = 0
-        transfer_bonus_amount = 0.0
-        transfer_bonus_details = []  # Track details for modal
-        
         # Build user skill lookups for efficient matching
         user_skills_map = self._build_user_skills_map(user)
-        logger.debug(f"User {user_email} has skills: {list(user_skills_map.keys())[:10]}")  # Log first 10
+        logger.debug(f"User {user_email} has {len(user_skills_map)} skills")
         
-        # Calculate max possible score (for normalization)
-        max_possible = self._calculate_max_possible_score(matched_skills)
+        # Calculate maximum possible coverage
+        max_possible_coverage = self._calculate_max_coverage(matched_skills)
+        
+        # Initialize scoring variables
+        coverage_score = 0.0
+        expertise_weighted_sum = 0.0
+        matched_skills_detail = []
         
         # Score each matched skill
         for matched_skill in matched_skills:
             skill_id = matched_skill['skill_id']
-            level = matched_skill['level']
             similarity = matched_skill['similarity']
             
             # Check if user has this skill
             if skill_id in user_skills_map:
                 user_skill = user_skills_map[skill_id]
                 rating = user_skill['rating']
+                level = user_skill.get('level', matched_skill.get('level', 0))
+                title = user_skill.get('title', matched_skill.get('title', ''))
                 
-                # Calculate base score for this skill
-                skill_score = (
-                    similarity *
-                    self.level_weights.get(level, 0.1) *
-                    self.rating_multipliers.get(rating, 1.0)
-                )
+                # Calculate relevancy weight (similarity squared)
+                relevancy_weight = similarity ** self.similarity_exponent
                 
-                raw_score += skill_score
+                # Add to coverage
+                coverage_score += relevancy_weight
+                
+                # Add to expertise (coverage weighted by rating)
+                rating_multiplier = self.rating_multipliers.get(rating, 1.0)
+                expertise_contribution = relevancy_weight * rating_multiplier
+                expertise_weighted_sum += expertise_contribution
                 
                 # Get parent titles for hierarchy display
                 parent_titles = user_skill.get('parent_ids', [])
-                # Convert parent IDs to titles using skills_lookup
                 parent_title_list = []
                 for parent_id in parent_titles:
                     parent_skill = skills_lookup.get(parent_id, {})
                     if parent_skill.get('title'):
                         parent_title_list.append(parent_skill['title'])
                 
-                # Track details
+                # Track details for modal display
                 matched_skills_detail.append({
                     'skill_id': skill_id,
-                    'title': matched_skill['title'],
+                    'title': title,
                     'level': level,
                     'rating': rating,
                     'similarity': similarity,
-                    'skill_score': skill_score,
-                    'match_type': 'direct',
-                    'parent_titles': parent_title_list  # Add hierarchy
+                    'relevancy_weight': relevancy_weight,
+                    'coverage_contribution': relevancy_weight,
+                    'expertise_contribution': expertise_contribution,
+                    'rating_multiplier': rating_multiplier,
+                    'parent_titles': parent_title_list
                 })
-                
-                # Count technology matches (L4)
-                if level == 4:
-                    tech_matches += 1
         
-        # Calculate transfer bonus
-        transfer_bonus_result = self._calculate_transfer_bonus(
-            user,
-            matched_skills,
-            user_skills_map,
-            skills_lookup
-        )
+        # Calculate coverage percentage
+        coverage_percentage = 0.0
+        if max_possible_coverage > 0:
+            coverage_percentage = (coverage_score / max_possible_coverage) * 100
         
-        transfer_bonus_amount = transfer_bonus_result['bonus']
-        transfer_bonus_details = transfer_bonus_result['details']
+        # Calculate expertise multiplier (weighted average)
+        expertise_multiplier = 1.0  # Default to beginner if no skills
+        if coverage_score > 0:
+            expertise_multiplier = expertise_weighted_sum / coverage_score
         
-        raw_score += transfer_bonus_amount
+        # Get human-readable expertise label
+        expertise_label = scoring_config.get_expertise_label(expertise_multiplier)
         
-        # Normalize score to 0-100
-        if max_possible > 0:
-            normalized_score = min(100.0, (raw_score / max_possible) * 100)
-        else:
-            normalized_score = 0.0
+        # Calculate raw score (coverage x expertise)
+        raw_score = coverage_score * expertise_multiplier
+        
+        # Sort skills by coverage contribution (descending) for display
+        matched_skills_detail.sort(key=lambda x: x['coverage_contribution'], reverse=True)
         
         return {
-            'raw_score': raw_score,
-            'normalized_score': round(normalized_score, 2),
+            'coverage_score': coverage_score,
+            'coverage_percentage': round(coverage_percentage, 2),
+            'expertise_multiplier': round(expertise_multiplier, 2),
+            'expertise_label': expertise_label,
+            'raw_score': round(raw_score, 4),
             'matched_skills_detail': matched_skills_detail,
-            'tech_matches': tech_matches,
-            'transfer_bonus': round(transfer_bonus_amount, 4),
-            'has_transfer_bonus': transfer_bonus_amount > 0,
-            'transfer_bonus_details': transfer_bonus_details
+            'total_matched_skills': len(matched_skills_detail)
         }
     
     def _build_user_skills_map(self, user: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-        """
-        Build efficient lookup map of user's skills.
-        
-        Returns:
-            {skill_id: {rating: int, level: int, title: str}}
-        """
+        """Build efficient lookup map of user's skills."""
         skills_map = {}
-        
-        # Log the user structure to understand what we're working with
-        user_keys = list(user.keys())
-        logger.debug(f"Building skills map for user with keys: {user_keys}")
         
         # Handle both 'skills' (processed) and 'selectedSkills' (raw) formats
         user_skills = user.get('skills', user.get('selectedSkills', []))
-        logger.debug(f"User has {len(user_skills)} skills")
         
         for skill in user_skills:
             skill_id = skill.get('skill_id')
@@ -240,148 +148,48 @@ class ScoringService:
                     'parent_ids': skill.get('parent_ids', [])
                 }
         
-        logger.debug(f"Built skills map with {len(skills_map)} skills")
         return skills_map
     
-    def _calculate_max_possible_score(self, matched_skills: List[Dict[str, Any]]) -> float:
-        """
-        Calculate maximum possible score (for normalization).
-        Assumes perfect similarity (1.0) and max rating (3).
-        """
-        max_score = 0.0
-        max_rating_multiplier = max(self.rating_multipliers.values())
+    def _calculate_max_coverage(self, matched_skills: List[Dict[str, Any]]) -> float:
+        """Calculate maximum possible coverage score."""
+        max_coverage = 0.0
         
         for skill in matched_skills:
-            level = skill['level']
-            level_weight = self.level_weights.get(level, 0.1)
-            max_score += (1.0 * level_weight * max_rating_multiplier)
+            similarity = skill.get('similarity', 0.0)
+            relevancy_weight = similarity ** self.similarity_exponent
+            max_coverage += relevancy_weight
         
-        return max_score
-    
-    def _calculate_transfer_bonus(
-        self,
-        user: Dict[str, Any],
-        matched_skills: List[Dict[str, Any]],
-        user_skills_map: Dict[str, Dict[str, Any]],
-        skills_lookup: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Calculate transfer bonus for users with relevant tech under different L3.
-        
-        Transfer Bonus Logic:
-        - If query matched an L3 skill AND the user has a relevant L4 technology
-          under a DIFFERENT L3 parent, give them partial credit
-        - This recognizes technology competence even in different contexts
-        
-        Example:
-            Query matched: "Serverless Architecture (L3) > AWS (L4)"
-            User has: "Cloud Security (L3) > AWS (L4)"
-            → User gets transfer bonus for AWS experience
-        
-        Returns:
-            Dictionary with 'bonus' (float) and 'details' (List[Dict])
-        """
-        transfer_count = 0
-        transfer_details = []
-        
-        # Get L3 skills from matched results
-        matched_l3_skills = [s for s in matched_skills if s['level'] == 3]
-        
-        for matched_l3 in matched_l3_skills:
-            matched_l3_id = matched_l3['skill_id']
-            
-            # Skip if user directly has this L3 skill (no bonus needed)
-            if matched_l3_id in user_skills_map:
-                continue
-            
-            # Get L4 children of this matched L3 from skills_lookup
-            l4_children = self._get_l4_children(matched_l3_id, skills_lookup)
-            
-            # Check if user has any of these L4 technologies under a DIFFERENT L3
-            for l4_child_id in l4_children:
-                if l4_child_id in user_skills_map:
-                    # User has this technology
-                    user_skill = user_skills_map[l4_child_id]
-                    user_l3_parents = user_skill.get('parent_ids', [])
-                    
-                    # Check if it's under a DIFFERENT L3 (not the matched one)
-                    # Find the L3 parent (parent_ids go from immediate parent to root)
-                    user_l3_parent = None
-                    for parent_id in user_l3_parents:
-                        parent_skill = skills_lookup.get(parent_id, {})
-                        if parent_skill.get('level') == 3:
-                            user_l3_parent = parent_id
-                            break
-                    
-                    # If user has this tech under a different L3, give transfer credit
-                    if user_l3_parent and user_l3_parent != matched_l3_id:
-                        transfer_count += 1
-                        
-                        # Track details for modal
-                        user_l3_parent_data = skills_lookup.get(user_l3_parent, {})
-                        transfer_details.append({
-                            'source_skill_id': l4_child_id,
-                            'source_skill_title': user_skill.get('title', ''),
-                            'source_parent_title': user_l3_parent_data.get('title', 'Unknown'),
-                            'matched_skill_id': l4_child_id,
-                            'matched_skill_title': user_skill.get('title', ''),
-                            'matched_parent_title': matched_l3['title'],
-                            'bonus_amount': self.transfer_bonus_per_tech
-                        })
-        
-        # Calculate bonus (per tech, capped)
-        bonus = min(
-            transfer_count * self.transfer_bonus_per_tech,
-            self.transfer_bonus_cap
-        )
-        
-        return {
-            'bonus': bonus,
-            'details': transfer_details
-        }
-    
-    def _get_l4_children(
-        self,
-        parent_id: str,
-        skills_lookup: Dict[str, Dict[str, Any]]
-    ) -> List[str]:
-        """
-        Get all L4 (technology) children of a given skill.
-        """
-        l4_children = []
-        
-        for skill_id, skill_data in skills_lookup.items():
-            if skill_data.get('level') == 4:
-                parent = skill_data.get('parent_id')
-                if parent == parent_id:
-                    l4_children.append(skill_id)
-        
-        return l4_children
+        return max_coverage
     
     def rank_users(
         self,
         users_scores: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """
-        Rank users by normalized score (descending).
-        Adds rank number to each user.
+        """Rank users by raw score (descending) and add display scores."""
+        if not users_scores:
+            return []
         
-        Args:
-            users_scores: List of user score dictionaries
-            
-        Returns:
-            Sorted list with rank added
-        """
-        # Sort by normalized score (descending)
+        # Sort by raw score (descending)
         sorted_users = sorted(
             users_scores,
-            key=lambda x: x['normalized_score'],
+            key=lambda x: x['raw_score'],
             reverse=True
         )
         
-        # Add rank
+        # Find top score for scaling
+        top_score = sorted_users[0]['raw_score'] if sorted_users else 1.0
+        
+        # Add rank and display score
         for i, user in enumerate(sorted_users, 1):
             user['rank'] = i
+            
+            # Calculate display score (scaled to 100 for top user)
+            if top_score > 0:
+                display_score = (user['raw_score'] / top_score) * scoring_config.SCORE_DISPLAY_SCALE
+            else:
+                display_score = 0.0
+            
+            user['display_score'] = round(display_score, 2)
         
         return sorted_users
     
@@ -389,70 +197,42 @@ class ScoringService:
         self,
         score_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Generate detailed score breakdown for modal display.
-        Shows ALL matched skills sorted by contribution.
-        
-        Args:
-            score_data: Full score data from calculate_user_score
-            
-        Returns:
-            Dictionary with formatted breakdown for frontend
-        """
+        """Generate detailed score breakdown for modal display."""
         matched_skills_detail = score_data.get('matched_skills_detail', [])
+        coverage_score = score_data.get('coverage_score', 0.0)
+        coverage_percentage = score_data.get('coverage_percentage', 0.0)
+        expertise_multiplier = score_data.get('expertise_multiplier', 1.0)
+        expertise_label = score_data.get('expertise_label', 'Beginner')
         raw_score = score_data.get('raw_score', 0.0)
-        normalized_score = score_data.get('normalized_score', 0.0)
-        transfer_bonus = score_data.get('transfer_bonus', 0.0)
-        transfer_bonus_details = score_data.get('transfer_bonus_details', [])
         
-        # Sort skills by contribution (descending)
-        sorted_skills = sorted(
-            matched_skills_detail,
-            key=lambda x: x.get('skill_score', 0),
-            reverse=True
-        )
-        
-        # Build list of ALL skill contributions
-        all_contributors = []
-        
-        for skill in sorted_skills:
-            skill_score = skill.get('skill_score', 0)
+        # Build detailed skill contributions list
+        skill_contributions = []
+        for skill in matched_skills_detail:
+            coverage_contrib = skill.get('coverage_contribution', 0)
+            coverage_pct = (coverage_contrib / coverage_score * 100) if coverage_score > 0 else 0
             
-            # Calculate percentage of total score
-            percentage = (skill_score / raw_score * 100) if raw_score > 0 else 0
-            
-            all_contributors.append({
+            skill_contributions.append({
                 'skill_id': skill.get('skill_id'),
                 'title': skill.get('title'),
                 'level': skill.get('level'),
                 'rating': skill.get('rating'),
                 'similarity': skill.get('similarity'),
-                'points_contributed': round(skill_score, 2),
-                'percentage_of_total': round(percentage, 1),
-                'match_type': skill.get('match_type', 'direct'),
-                'parent_titles': skill.get('parent_titles', [])  # Include hierarchy
+                'relevancy_weight': skill.get('relevancy_weight'),
+                'coverage_contribution': round(coverage_contrib, 4),
+                'coverage_percentage': round(coverage_pct, 1),
+                'expertise_contribution': round(skill.get('expertise_contribution', 0), 4),
+                'rating_multiplier': skill.get('rating_multiplier'),
+                'parent_titles': skill.get('parent_titles', [])
             })
         
-        # Determine score interpretation
-        if normalized_score >= 80:
-            interpretation = "Excellent Match"
-        elif normalized_score >= 60:
-            interpretation = "Strong Match"
-        elif normalized_score >= 40:
-            interpretation = "Good Match"
-        elif normalized_score >= 20:
-            interpretation = "Fair Match"
-        else:
-            interpretation = "Weak Match"
-        
         return {
-            'raw_score': round(raw_score, 2),
-            'normalized_score': round(normalized_score, 2),
+            'coverage_score': round(coverage_score, 4),
+            'coverage_percentage': round(coverage_percentage, 2),
+            'expertise_multiplier': round(expertise_multiplier, 2),
+            'expertise_label': expertise_label,
+            'raw_score': round(raw_score, 4),
             'total_matched_skills': len(matched_skills_detail),
-            'skill_contributions': all_contributors,  # All skills now
-            'transfer_bonus_total': round(transfer_bonus, 2),
-            'transfer_bonus_details': transfer_bonus_details,
-            'score_interpretation': interpretation
+            'skill_contributions': skill_contributions
         }
 
 

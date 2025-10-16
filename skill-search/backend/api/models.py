@@ -40,32 +40,24 @@ class SkillContribution(BaseModel):
     level: int
     rating: int
     similarity: float
-    points_contributed: float  # How many points this skill added to total score
-    percentage_of_total: float  # What % of user's total score this represents
-    match_type: str  # 'direct' or other types
+    relevancy_weight: float  # similarity^2
+    coverage_contribution: float  # Contribution to coverage score
+    coverage_percentage: float  # % of total coverage this skill represents
+    expertise_contribution: float  # relevancy_weight * rating_multiplier
+    rating_multiplier: float  # 1.0, 3.0, or 6.0 based on rating
     parent_titles: List[str] = []  # Skill hierarchy for display
-
-
-class TransferBonusDetail(BaseModel):
-    """Model for transfer bonus details."""
-    source_skill_id: str
-    source_skill_title: str
-    source_parent_title: str  # The L3 parent the user has this under
-    matched_skill_id: str
-    matched_skill_title: str
-    matched_parent_title: str  # The L3 parent from the query match
-    bonus_amount: float
 
 
 class ScoreBreakdown(BaseModel):
     """Model for detailed score breakdown for a user."""
-    raw_score: float
-    normalized_score: float
+    coverage_score: float  # Raw coverage value (sum of similarity^2)
+    coverage_percentage: float  # Coverage as % of maximum possible (0-100)
+    expertise_multiplier: float  # Weighted average rating multiplier (1.0-6.0)
+    expertise_label: str  # Human-readable: Beginner, Early Career, Intermediate, Advanced, Expert
+    raw_score: float  # coverage_score * expertise_multiplier
+    display_score: Optional[float] = None  # Scaled score (top user = 100), added after ranking
     total_matched_skills: int
-    skill_contributions: List[SkillContribution]  # Top contributors (80% of score)
-    transfer_bonus_total: float
-    transfer_bonus_details: List[TransferBonusDetail] = []
-    score_interpretation: str  # e.g., "Excellent Match", "Strong Match"
+    skill_contributions: List[SkillContribution]  # Detailed per-skill breakdown
 
 
 class UserResult(BaseModel):
@@ -73,9 +65,13 @@ class UserResult(BaseModel):
     email: str
     name: str
     rank: int
-    score: float  # Normalized 0-100
+    coverage_score: float  # Raw coverage value
+    coverage_percentage: float  # Coverage as % of maximum (0-100)
+    expertise_multiplier: float  # Weighted average rating (1.0-6.0)
+    expertise_label: str  # Human-readable expertise level
+    raw_score: float  # coverage * expertise (for sorting)
+    display_score: float  # Scaled to top user = 100
     matched_skills: List[MatchedSkill]
-    transfer_bonus: float
     score_breakdown: Optional[ScoreBreakdown] = None  # Detailed breakdown for modal
 
 

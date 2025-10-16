@@ -98,6 +98,32 @@ EOF
 }
 
 ################################################################################
+# Display Skill Search Submenu
+################################################################################
+show_skill_search_menu() {
+    clear
+    echo -e "${CYAN}"
+    cat << "EOF"
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║              SKILL SEARCH - MANAGEMENT MENU                                  ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${RESET}"
+    
+    echo -e "${BOLD}Select an operation:${RESET}"
+    echo ""
+    echo "  1) Setup & Run Application          - Configure and start Docker containers"
+    echo "  2) Test Scoring & Ranking           - Analyze scoring algorithm behavior"
+    echo ""
+    echo "  3) Return to Main Menu"
+    echo ""
+    echo -e "${YELLOW}═══════════════════════════════════════════════════════════════════════════${RESET}"
+    echo ""
+}
+
+################################################################################
 # Execute Component Script
 ################################################################################
 execute_component() {
@@ -176,6 +202,72 @@ handle_skill_embeddings() {
 }
 
 ################################################################################
+# Handle Skill Search Submenu
+################################################################################
+handle_skill_search() {
+    local submenu_choice=""
+    while true; do
+        # Clear any lingering input
+        while read -r -t 0; do read -r; done 2>/dev/null
+        
+        show_skill_search_menu
+        submenu_choice=""
+        read -r -p "Enter your choice (1-3): " submenu_choice </dev/tty
+        echo ""
+        
+        case "$submenu_choice" in
+            1)
+                execute_component "Setup & Run Skill Search" "$SKILL_SEARCH_SETUP" false
+                ;;
+            2)
+                # Prompt for search query
+                echo -e "${BOLD}Test Scoring & Ranking${RESET}"
+                echo ""
+                read -r -p "Enter search query (e.g., 'aws lambda'): " search_query </dev/tty
+                
+                if [ -z "$search_query" ]; then
+                    echo ""
+                    echo -e "${YELLOW}No query provided. Test cancelled.${RESET}"
+                    echo ""
+                    sleep 2
+                    continue
+                fi
+                
+                echo ""
+                echo -e "${GREEN}Running test with query: '${search_query}'${RESET}"
+                echo ""
+                
+                # Change to skill-search directory and run test script
+                cd "${SCRIPT_DIR}/skill-search"
+                
+                # Run the test script via Docker container
+                set +e
+                docker-compose exec backend python /app/scripts/test_scoring_and_ranking.py "$search_query"
+                local exit_code=$?
+                set -e
+                
+                echo ""
+                echo ""
+                bash "$BANNER_SCRIPT" "Test Scoring & Ranking" "$exit_code"
+                read -r -p "" </dev/tty
+                
+                # Return to script directory
+                cd "$SCRIPT_DIR"
+                ;;
+            3)
+                return 0
+                ;;
+            *)
+                echo ""
+                echo -e "${YELLOW}Invalid selection. Please choose 1-3.${RESET}"
+                echo ""
+                sleep 2
+                ;;
+        esac
+    done
+}
+
+################################################################################
 # Handle Menu Selection
 ################################################################################
 handle_selection() {
@@ -189,7 +281,7 @@ handle_selection() {
             handle_skill_embeddings
             ;;
         3)
-            execute_component "Skill Search" "$SKILL_SEARCH_SETUP" false
+            handle_skill_search
             ;;
         4)
             echo ""

@@ -5,10 +5,10 @@ import { FiX, FiChevronDown, FiChevronUp } from 'react-icons/fi';
  * ScoreBreakdownModal - Modal showing detailed score breakdown for individual user
  * 
  * Features:
- * - Shows ALL skills with top 80% visible, rest expandable
- * - Displays point contribution and skill hierarchy per skill
- * - Detailed transfer bonus with source → matched skill relationships
- * - Clean, professional modal design matching user card styling
+ * - Shows Coverage and Expertise as primary dimensions
+ * - Displays ALL matched skills with contribution details
+ * - Shows raw score and display score
+ * - Clean, professional modal design
  * - Close on backdrop click or X button
  * 
  * Props:
@@ -36,30 +36,19 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
   if (!isOpen || !scoreBreakdown) return null;
 
   const {
-    normalized_score,
-    score_interpretation,
+    coverage_score,
+    coverage_percentage,
+    expertise_multiplier,
+    expertise_label,
+    raw_score,
+    display_score,
     skill_contributions,
-    transfer_bonus_total,
-    transfer_bonus_details,
     total_matched_skills
   } = scoreBreakdown;
-
-  // Calculate which skills are in top 80%
-  const totalPoints = skill_contributions.reduce((sum, skill) => sum + skill.points_contributed, 0);
-  let cumulativePercentage = 0;
-  let top80Index = skill_contributions.length;
   
-  for (let i = 0; i < skill_contributions.length; i++) {
-    cumulativePercentage += (skill_contributions[i].points_contributed / totalPoints) * 100;
-    if (cumulativePercentage >= 80 && top80Index === skill_contributions.length) {
-      top80Index = Math.max(i + 1, 3); // Show at least 3 skills
-      break;
-    }
-  }
-
-  const topSkills = skill_contributions.slice(0, top80Index);
-  const remainingSkills = skill_contributions.slice(top80Index);
-  const remainingPercentage = remainingSkills.reduce((sum, skill) => sum + skill.percentage_of_total, 0);
+  // Split skills: top 5 always visible, rest expandable
+  const topSkills = skill_contributions?.slice(0, 5) || [];
+  const remainingSkills = skill_contributions?.slice(5) || [];
 
   // Rating label helper
   const getRatingLabel = (rating) => {
@@ -78,8 +67,21 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
     return labels[level] || `Level ${level}`;
   };
   
+  //Get expertise color class
+  const getExpertiseColorClass = (expertiseLabel) => {
+    const labelMap = {
+      'Expert': 'expertise-expert',
+      'Advanced': 'expertise-advanced',
+      'Intermediate': 'expertise-intermediate',
+      'Early Career': 'expertise-early',
+      'Beginner': 'expertise-beginner'
+    };
+    return labelMap[expertiseLabel] || 'expertise-beginner';
+  };
+  
   // Get score color class
   const getScoreColorClass = (score) => {
+    if (!score) return 'score-low';
     if (score >= 80) return 'score-excellent';
     if (score >= 60) return 'score-strong';
     if (score >= 40) return 'score-good';
@@ -111,7 +113,7 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
           )}
         </div>
         <div className="skill-contribution-points">
-          +{skill.points_contributed} pts
+          {skill.coverage_percentage?.toFixed(1) || '0.0'}% coverage
         </div>
       </div>
       
@@ -125,8 +127,8 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
         <span className="skill-detail-badge similarity">
           {(skill.similarity * 100).toFixed(0)}% match
         </span>
-        <span className="skill-detail-badge percentage">
-          {skill.percentage_of_total.toFixed(1)}% of total
+        <span className="skill-detail-badge rating-multiplier">
+          {skill.rating_multiplier?.toFixed(1) || '1.0'}× multiplier
         </span>
       </div>
     </div>
@@ -153,13 +155,29 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
           </button>
         </div>
 
-        {/* Overall Score */}
-        <div className={`modal-score-summary ${getScoreColorClass(normalized_score)}`}>
-          <div className="modal-score-value">
-            {normalized_score.toFixed(1)}
+        {/* Two-Dimensional Score Summary */}
+        <div className={`modal-score-summary ${getScoreColorClass(display_score || 0)}`}>
+          <div className="score-dimensions-modal">
+            <div className="dimension-item-modal">
+              <span className="dimension-label-modal">Coverage</span>
+              <span className="dimension-value-modal">{coverage_percentage?.toFixed(1) || '0.0'}%</span>
+              <span className="dimension-detail-modal">Breadth of relevant skills</span>
+            </div>
+            <div className={`dimension-item-modal ${getExpertiseColorClass(expertise_label)}`}>
+              <span className="dimension-label-modal">Expertise</span>
+              <span className="dimension-value-modal">{expertise_label || 'Unknown'}</span>
+              <span className="dimension-detail-modal">{expertise_multiplier?.toFixed(2) || '1.00'}× multiplier</span>
+            </div>
           </div>
-          <div className="modal-score-label">
-            {score_interpretation}
+          <div className="score-display-modal-secondary">
+            <div className="score-item-modal">
+              <span className="score-label-modal">Raw Score</span>
+              <span className="score-value-modal">{raw_score?.toFixed(4) || '0.0000'}</span>
+            </div>
+            <div className="score-item-modal">
+              <span className="score-label-modal">Display Score</span>
+              <span className="score-value-modal">{display_score?.toFixed(1) || '0.0'}/100</span>
+            </div>
           </div>
         </div>
 
@@ -187,11 +205,11 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
                 >
                   {showAllSkills ? (
                     <>
-                      <FiChevronUp /> Hide {remainingSkills.length} skills ({remainingPercentage.toFixed(1)}% of score)
+                      <FiChevronUp /> Hide {remainingSkills.length} skills
                     </>
                   ) : (
                     <>
-                      <FiChevronDown /> Show {remainingSkills.length} more skills ({remainingPercentage.toFixed(1)}% of score)
+                      <FiChevronDown /> Show {remainingSkills.length} more skills
                     </>
                   )}
                 </button>
@@ -199,43 +217,6 @@ function ScoreBreakdownModal({ isOpen, onClose, userName, scoreBreakdown }) {
             )}
           </div>
         </div>
-
-        {/* Transfer Bonus Details */}
-        {transfer_bonus_total > 0 && transfer_bonus_details.length > 0 && (
-          <div className="modal-section transfer-bonus-section">
-            <h4>Transfer Bonus</h4>
-            <div className="transfer-bonus-summary">
-              <span>+{transfer_bonus_total.toFixed(2)} points</span>
-              <span className="transfer-bonus-description">
-                Credit for related technology experience
-              </span>
-            </div>
-            
-            <div className="transfer-details-list">
-              {transfer_bonus_details.map((detail, index) => (
-                <div key={index} className="transfer-detail-item">
-                  <div className="transfer-path">
-                    <div className="transfer-source">
-                      <span className="transfer-label">Your Experience:</span>
-                      <span className="transfer-skill">{detail.source_parent_title}</span>
-                      <span className="transfer-arrow">→</span>
-                      <span className="transfer-tech">{detail.source_skill_title}</span>
-                    </div>
-                    <div className="transfer-matched">
-                      <span className="transfer-label">Matched To:</span>
-                      <span className="transfer-skill">{detail.matched_parent_title}</span>
-                      <span className="transfer-arrow">→</span>
-                      <span className="transfer-tech">{detail.matched_skill_title}</span>
-                    </div>
-                  </div>
-                  <div className="transfer-bonus-amount">
-                    +{(detail.bonus_amount * 100).toFixed(1)}%
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Footer with close button */}
         <div className="modal-footer">

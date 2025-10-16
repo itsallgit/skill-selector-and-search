@@ -68,29 +68,11 @@ class Settings(BaseSettings):
     top_k_skills: int = 20  # Number of skills to retrieve from vector search
     min_similarity: float = 0.35  # Minimum similarity threshold
     
-    # Scoring Weights (configurable)
-    level_weight_l1: float = 0.1
-    level_weight_l2: float = 0.2
-    level_weight_l3: float = 0.5
-    level_weight_l4: float = 0.3
-    
-    # Rating Multipliers (exponential)
-    rating_multiplier_1: float = 1.0  # Beginner
-    rating_multiplier_2: float = 2.0  # Intermediate
-    rating_multiplier_3: float = 4.0  # Advanced
-    
-    # Transfer Bonus
-    transfer_bonus_per_tech: float = 0.02
-    transfer_bonus_cap: float = 0.15
-    
-    # Score Buckets (for display)
-    excellent_min_score: int = 80
-    strong_min_score: int = 60
-    good_min_score: int = 40
-    
     # Display Configuration
     top_users_count: int = 5
     users_per_page: int = 10
+    
+    # Note: Scoring algorithm configuration is now in config/scoring_algorithm.py
     
     model_config = SettingsConfigDict(
         env_file=".env",

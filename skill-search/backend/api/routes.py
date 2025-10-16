@@ -114,7 +114,7 @@ async def search_skills(request: SearchRequest):
             )
             
             # Skip users with zero score
-            if score_data['normalized_score'] == 0:
+            if score_data['raw_score'] == 0:
                 logger.debug(f"Skipping user with zero score")
                 continue
             
@@ -144,7 +144,7 @@ async def search_skills(request: SearchRequest):
                     )
                 )
             
-            logger.debug(f"Adding user {user_email} with score {score_data['normalized_score']}")
+            logger.debug(f"Adding user {user_email} with score {score_data['raw_score']}")
             
             # Generate score breakdown for modal (will be included in response)
             score_breakdown = scoring_service.generate_score_breakdown(score_data)
@@ -152,13 +152,13 @@ async def search_skills(request: SearchRequest):
             users_scores.append({
                 'email': user_email,
                 'name': user_name,
-                'score': score_data['normalized_score'],
-                'normalized_score': score_data['normalized_score'],  # For rank_users function
+                'coverage_score': score_data['coverage_score'],
+                'coverage_percentage': score_data['coverage_percentage'],
+                'expertise_multiplier': score_data['expertise_multiplier'],
+                'expertise_label': score_data['expertise_label'],
                 'raw_score': score_data['raw_score'],
                 'matched_skills': user_matched_skills,
-                'transfer_bonus': score_data['transfer_bonus'],
-                'has_transfer_bonus': score_data['has_transfer_bonus'],
-                'score_breakdown': score_breakdown  # Add breakdown data
+                'score_breakdown': score_breakdown
             })
         
         if not users_scores:
@@ -180,10 +180,14 @@ async def search_skills(request: SearchRequest):
                 email=u['email'],
                 name=u['name'],
                 rank=u['rank'],
-                score=u['score'],
+                coverage_score=u['coverage_score'],
+                coverage_percentage=u['coverage_percentage'],
+                expertise_multiplier=u['expertise_multiplier'],
+                expertise_label=u['expertise_label'],
+                raw_score=u['raw_score'],
+                display_score=u['display_score'],
                 matched_skills=u['matched_skills'],
-                transfer_bonus=u['transfer_bonus'],
-                score_breakdown=u.get('score_breakdown')  # Include breakdown
+                score_breakdown=u.get('score_breakdown')
             )
             for u in ranked_users[:request.top_n_users]
         ]
@@ -321,26 +325,13 @@ async def get_stats():
             skills_by_level=level_counts,
             skills_by_rating=rating_counts,
             config={
-                'level_weights': {
-                    'l1': settings.level_weight_l1,
-                    'l2': settings.level_weight_l2,
-                    'l3': settings.level_weight_l3,
-                    'l4': settings.level_weight_l4
-                },
                 'rating_multipliers': {
-                    '1': settings.rating_multiplier_1,
-                    '2': settings.rating_multiplier_2,
-                    '3': settings.rating_multiplier_3
+                    '1': 1.0,
+                    '2': 3.0,
+                    '3': 6.0
                 },
-                'transfer_bonus': {
-                    'per_tech': settings.transfer_bonus_per_tech,
-                    'cap': settings.transfer_bonus_cap
-                },
-                'score_buckets': {
-                    'excellent_min': settings.excellent_min_score,
-                    'strong_min': settings.strong_min_score,
-                    'good_min': settings.good_min_score
-                }
+                'similarity_exponent': 2,
+                'scoring_algorithm': 'coverage_x_expertise'
             }
         )
         
@@ -379,7 +370,7 @@ def _build_skills_lookup(users: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any
 
 def _create_score_buckets(users: List[Dict[str, Any]]) -> List[ScoreBucket]:
     """
-    Organize users into score buckets.
+    Organize users into score buckets based on display_score.
     
     Buckets:
     - Excellent: 80-100
@@ -390,33 +381,33 @@ def _create_score_buckets(users: List[Dict[str, Any]]) -> List[ScoreBucket]:
     buckets_config = [
         {
             'name': 'Excellent Match',
-            'min_score': settings.excellent_min_score,
+            'min_score': 80.0,
             'max_score': 100.0
         },
         {
             'name': 'Strong Match',
-            'min_score': settings.strong_min_score,
-            'max_score': settings.excellent_min_score - 0.01
+            'min_score': 60.0,
+            'max_score': 79.99
         },
         {
             'name': 'Good Match',
-            'min_score': settings.good_min_score,
-            'max_score': settings.strong_min_score - 0.01
+            'min_score': 40.0,
+            'max_score': 59.99
         },
         {
             'name': 'Other Matches',
             'min_score': 0.0,
-            'max_score': settings.good_min_score - 0.01
+            'max_score': 39.99
         }
     ]
     
     buckets = []
     
     for bucket_cfg in buckets_config:
-        # Filter users in this bucket
+        # Filter users in this bucket (using display_score)
         bucket_users = [
             u for u in users
-            if bucket_cfg['min_score'] <= u['score'] <= bucket_cfg['max_score']
+            if bucket_cfg['min_score'] <= u.get('display_score', 0) <= bucket_cfg['max_score']
         ]
         
         # Convert to UserResult models
@@ -425,9 +416,13 @@ def _create_score_buckets(users: List[Dict[str, Any]]) -> List[ScoreBucket]:
                 email=u['email'],
                 name=u['name'],
                 rank=u['rank'],
-                score=u['score'],
-                matched_skills=u['matched_skills'],
-                transfer_bonus=u['transfer_bonus']
+                coverage_score=u['coverage_score'],
+                coverage_percentage=u['coverage_percentage'],
+                expertise_multiplier=u['expertise_multiplier'],
+                expertise_label=u['expertise_label'],
+                raw_score=u['raw_score'],
+                display_score=u['display_score'],
+                matched_skills=u['matched_skills']
             )
             for u in bucket_users
         ]
