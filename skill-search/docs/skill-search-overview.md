@@ -6,12 +6,13 @@ A full-stack web application for finding users by skills using natural language 
 
 - **Natural Language Search**: Enter queries like "AWS Lambda and serverless architecture" to find relevant users
 - **Vector-based Matching**: Uses AWS Bedrock Titan Embeddings V2 for semantic skill matching
-- **Smart Ranking Algorithm**: 
-  - Weighted scoring across skill hierarchy levels (L1-L4)
-  - Exponential rating multipliers for user proficiency
-  - Transfer bonus for related technologies under different categories
+- **Two-Dimensional Ranking Algorithm**: 
+  - **Coverage** (Breadth): Measures relevant skills matched (Σ similarity²)
+  - **Expertise** (Depth): Measures proficiency level (weighted average with 1.0×, 3.0×, 6.0× multipliers)
+  - Final ranking = Coverage × Expertise
 - **Intuitive UI**:
   - Top 5 matches always displayed
+  - Prominent visual display of Coverage and Expertise dimensions
   - Expandable score buckets (Excellent, Strong, Good, Other)
   - User detail pages with full skill breakdown
 - **Docker Deployment**: One-click setup with `./skill-search-setup.sh`

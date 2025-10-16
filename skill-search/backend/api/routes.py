@@ -102,9 +102,9 @@ async def search_skills(request: SearchRequest):
             logger.debug(f"Processing user, has {len(user_skill_ids)} skills")
             
             if not user_skill_ids.intersection(matched_skill_ids):
-                # No matches, but check for transfer bonus eligibility
+                # No matches - user will get zero score
                 logger.debug(f"User has no direct skill matches")
-                pass  # Let scoring service handle transfer bonus
+                pass
             
             # Calculate score
             score_data = scoring_service.calculate_user_score(

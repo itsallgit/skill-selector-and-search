@@ -72,29 +72,25 @@ INGESTION_BUCKET=<your-ingestion-bucket-name>  # e.g., skills-selector-XXXXXXXXX
 
 ## Scoring Configuration
 
-Customize the ranking algorithm:
+Customize the two-dimensional ranking algorithm:
 
 ```bash
-# Level weights
-LEVEL_WEIGHT_L1=0.1   # Categories - broad context
-LEVEL_WEIGHT_L2=0.2   # Sub-categories
-LEVEL_WEIGHT_L3=0.5   # Generic skills - MOST IMPORTANT
-LEVEL_WEIGHT_L4=0.3   # Technologies/tools
-
 # Rating multipliers (exponential proficiency boost)
 RATING_MULTIPLIER_1=1.0   # Beginner
-RATING_MULTIPLIER_2=2.0   # Intermediate
-RATING_MULTIPLIER_3=4.0   # Advanced
+RATING_MULTIPLIER_2=3.0   # Intermediate
+RATING_MULTIPLIER_3=6.0   # Advanced
 
-# Transfer bonus (partial credit for related tech)
-TRANSFER_BONUS_PER_TECH=0.02
-TRANSFER_BONUS_CAP=0.15
-
-# Score buckets (percentage thresholds)
+# Score buckets (percentage thresholds for display scores)
 EXCELLENT_MIN_SCORE=80
 STRONG_MIN_SCORE=60
 GOOD_MIN_SCORE=40
 ```
+
+**How It Works**:
+- **Coverage** = Σ(similarity²) for all matched skills
+- **Expertise** = Weighted average using rating multipliers above
+- **Raw Score** = Coverage × Expertise (used for ranking)
+- **Display Score** = (Raw Score / Top Score) × 100 (shown in UI, top user = 100)
 
 ## Display Configuration
 

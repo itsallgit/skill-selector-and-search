@@ -2,83 +2,112 @@
 
 ## Scoring Algorithm
 
-The scoring algorithm ranks users based on multiple factors to provide intelligent, contextual search results.
+The scoring algorithm uses a **two-dimensional approach** to rank users based on both skill breadth (Coverage) and skill depth (Expertise).
 
 ### Design Rationale
 
-The algorithm balances three key considerations:
-1. **Semantic Relevance**: How closely skills match the query (vector similarity)
-2. **Skill Importance**: Hierarchy level matters (L3 generic skills > L4 tools)
-3. **User Proficiency**: Advanced users should rank higher for matched skills
+The algorithm balances two key dimensions:
+1. **Coverage (Breadth)**: How many relevant skills the user possesses
+2. **Expertise (Depth)**: The proficiency level across those matched skills
 
-### 1. Level Weights
+This ensures that users with deep expertise in highly relevant skills rank appropriately compared to users with many weakly relevant skills.
 
-How much each skill hierarchy level contributes to the score:
-- **L1 (Categories)**: 0.1 - Very broad, minimal weight
-- **L2 (Sub-categories)**: 0.2 - Broader context
-- **L3 (Generic Skills)**: 0.5 - **MOST IMPORTANT** - Core competencies
-- **L4 (Technologies)**: 0.3 - Specific tools/tech
+### Dimension 1: Coverage
 
-**Rationale**: L3 skills represent transferable competencies (e.g., "Container Orchestration") while L4 are specific implementations (e.g., "Kubernetes"). Prioritizing L3 ensures we find users with the right conceptual knowledge, not just tool experience.
+**Coverage** measures the breadth and strength of skill matches against the query.
 
-### 2. Rating Multipliers (Exponential)
-
-User's self-assessed proficiency level:
-- **Beginner (1)**: 1.0x
-- **Intermediate (2)**: 2.0x
-- **Advanced (3)**: 4.0x
-
-**Rationale**: Advanced users with relevant L3 skills should rank higher than Intermediate users even if the latter have more specific L4 tool matches. The exponential scale reflects the non-linear growth in competency.
-
-### 3. Similarity Score
-
-From vector search (0-1 scale):
-- Derived from cosine distance: `similarity = 1 - distance`
-- Measures how semantically close the skill is to the query
-
-Lower cosine distance = higher similarity = better match.
-
-### 4. Transfer Bonus
-
-Partial credit for related technology experience:
-- If query matches an L3 skill, but user only has the L4 technology under a **different** L3, they get partial credit
-- **Example**: 
-  - Query matches: "Serverless Architecture (L3) > AWS Lambda (L4)"
-  - User has: "Cloud Security (L3) > AWS Lambda (L4)"
-  - → User gets transfer bonus for AWS Lambda competence
-- **Bonus**: 0.02 per transferable technology, capped at 0.15 (15%)
-
-**Rationale**: Technology experience often transfers across domains. Someone with AWS Lambda experience in security can apply that knowledge to serverless architecture projects.
-
-### Formula
-
-For each matched skill:
-```
-base_score = similarity × level_weight × rating_multiplier
+**Formula**:
+```python
+coverage = Σ(similarity²) for all matched skills
 ```
 
-User total score:
+**How It Works**:
+- Each matched skill contributes based on its semantic similarity to the query
+- Similarity values range from 0.0 to 1.0 (from vector search cosine distance)
+- Squaring the similarity emphasizes stronger matches while still giving credit to weaker ones
+- Higher coverage = more relevant skills = better breadth
+
+**Example**:
+- Query: "AWS Lambda and serverless architecture"
+- User has 3 matched skills:
+  - AWS Lambda: similarity = 0.95 → contributes 0.9025
+  - Serverless Architecture: similarity = 0.88 → contributes 0.7744
+  - API Gateway: similarity = 0.75 → contributes 0.5625
+- Total coverage = 0.9025 + 0.7744 + 0.5625 = 2.2394
+
+**Display**: Coverage is shown as a percentage relative to maximum possible coverage:
+```python
+coverage_percentage = (coverage / max_possible_coverage) × 100
 ```
-raw_score = Σ(base_score for all matched skills) + transfer_bonus
-normalized_score = (raw_score / max_possible_score) × 100
+
+### Dimension 2: Expertise
+
+**Expertise** measures the average proficiency level across matched skills.
+
+**Formula**:
+```python
+expertise = Σ(similarity² × rating_multiplier) / Σ(similarity²)
 ```
 
-### Ranking Example
+**Rating Multipliers**:
+- **Beginner (1)**: 1.0× multiplier
+- **Intermediate (2)**: 3.0× multiplier  
+- **Advanced (3)**: 6.0× multiplier
 
-Query: "Container Orchestration (L3) + Kubernetes (L4)"
+**Rationale**: The exponential scale (1.0, 3.0, 6.0) reflects the non-linear growth in competency. An Advanced user's expertise is worth significantly more than an Intermediate user's.
 
-1. **User C**: Has Kubernetes (L4) under Container Orchestration (L3)
-   - Direct L3 + L4 match = **HIGHEST** score
-   - Gets full weight for both hierarchy levels
+**Expertise Labels**:
+- 5.0+ → **Expert**
+- 3.5-4.9 → **Advanced**
+- 2.0-3.4 → **Intermediate**
+- 1.3-1.9 → **Early Career**
+- < 1.3 → **Beginner**
 
-2. **User B**: Has Docker (L4) under Container Orchestration (L3)
-   - Direct L3 match + different L4 = **HIGH** score
-   - Strong L3 match compensates for different L4 tool
+**Example**:
+Using the same 3 matched skills from above:
+- AWS Lambda (similarity² = 0.9025, rating = 3): 0.9025 × 6.0 = 5.415
+- Serverless Architecture (similarity² = 0.7744, rating = 2): 0.7744 × 3.0 = 2.323
+- API Gateway (similarity² = 0.5625, rating = 3): 0.5625 × 6.0 = 3.375
+- Total weighted = 11.113
+- Total weight = 2.2394
+- Expertise = 11.113 / 2.2394 = 4.96 → **Advanced**
 
-3. **User A**: Has Kubernetes (L4) under DevOps (different L3)
-   - No L3 match, but gets transfer bonus = **MEDIUM** score
-   - Ranks above users with NO relevant skills
-   - Kubernetes experience recognized even in different context
+### Final Ranking
+
+**Raw Score** = Coverage × Expertise
+
+This raw score is used for ranking users. Higher values indicate better matches overall.
+
+**Example**:
+- Coverage = 2.2394
+- Expertise = 4.96
+- Raw Score = 2.2394 × 4.96 = 11.107
+
+**Display Score**: For the UI, scores are normalized so the top user = 100:
+```python
+display_score = (user_raw_score / top_user_raw_score) × 100
+```
+
+### Ranking Scenarios
+
+**Scenario 1: Breadth vs. Depth**
+- **User A**: 10 matched skills, average expertise = 2.5 (Intermediate)
+  - Coverage = 5.0, Expertise = 2.5, Raw Score = 12.5
+- **User B**: 3 matched skills, average expertise = 5.5 (Expert)
+  - Coverage = 2.8, Expertise = 5.5, Raw Score = 15.4
+- **Result**: User B ranks higher (deeper expertise wins)
+
+**Scenario 2: High Relevance Wins**
+- **User C**: 1 perfect match (similarity = 0.95, rating = 3)
+  - Coverage = 0.9025, Expertise = 6.0, Raw Score = 5.42
+- **User D**: 5 weak matches (average similarity = 0.6, rating = 3)
+  - Coverage = 1.8, Expertise = 6.0, Raw Score = 10.8
+- **Result**: User D ranks higher (more coverage, same expertise)
+
+**Scenario 3: Balanced Match**
+- **User E**: 5 strong matches (average similarity = 0.85), mix of Advanced and Intermediate ratings
+  - Coverage = 3.6, Expertise = 4.2, Raw Score = 15.12
+- **Result**: Balanced approach to coverage and expertise often performs best
 
 ## API Endpoints
 

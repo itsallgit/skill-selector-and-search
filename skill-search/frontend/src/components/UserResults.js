@@ -84,33 +84,33 @@ function UserResults({ users, title = "Users" }) {
       <div className="users-list">
         {users.map((user) => (
           <div key={user.email} className="user-card">
-            <div className="user-header">
-              <div className="user-info">
-                <span className="user-rank">#{user.rank}</span>
-                <Link to={`/user/${encodeURIComponent(user.email)}`} className="user-name">
+            <div className="user-header-single-row">
+              {/* Left side: Rank, Name, Email */}
+              <div className="user-info-left">
+                <span className="user-rank-bold">#{user.rank}</span>
+                <Link to={`/user/${encodeURIComponent(user.email)}`} className="user-name-bold">
                   {user.name}
                 </Link>
                 <span className="user-email">{user.email}</span>
               </div>
-              <div className={`user-score-two-dimensional ${getScoreColorClass(user.display_score)}`}>
-                {/* PRIMARY: Coverage and Expertise */}
-                <div className="score-dimensions">
-                  <div className="dimension-item">
-                    <span className="dimension-label">Coverage</span>
-                    <span className="dimension-value">{user.coverage_percentage?.toFixed(1) || '0.0'}%</span>
-                  </div>
-                  <div className={`dimension-item ${getExpertiseColorClass(user.expertise_label)}`}>
-                    <span className="dimension-label">Expertise</span>
-                    <span className="dimension-value">{user.expertise_label || 'Unknown'}</span>
-                  </div>
+              
+              {/* Right side: Coverage, Expertise, Raw Score, Info Button */}
+              <div className="user-score-row">
+                <div className="dimension-item-compact">
+                  <span className="dimension-label-compact">Coverage</span>
+                  <span className="dimension-value-compact">{user.coverage_percentage?.toFixed(1) || '0.0'}%</span>
                 </div>
-                {/* SECONDARY: Display Score */}
-                <div className="score-display-secondary">
-                  <span className="score-value-small">{user.display_score?.toFixed(1) || '0.0'}</span>
+                <div className={`dimension-item-compact ${getExpertiseColorClass(user.expertise_label)}`}>
+                  <span className="dimension-label-compact">Expertise</span>
+                  <span className="dimension-value-compact">{user.expertise_label || 'Unknown'}</span>
+                </div>
+                <div className="raw-score-compact">
+                  <span className="raw-score-label">Score</span>
+                  <span className="raw-score-value">{user.display_score?.toFixed(1) || '0.0'}</span>
                 </div>
                 {user.score_breakdown && (
                   <button 
-                    className="score-info-button"
+                    className="score-info-button-grey"
                     onClick={() => handleScoreClick(user)}
                     aria-label="View score breakdown"
                     title="View detailed score breakdown"

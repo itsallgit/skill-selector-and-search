@@ -34,11 +34,23 @@ docker-compose down
 
 ## What It Does
 
-Enter natural language queries like **"AWS Lambda and serverless architecture"** to find users with matching skills. The application uses semantic search to understand meaning, not just keywords, and ranks users based on:
+Enter natural language queries like **"AWS Lambda and serverless architecture"** to find users with matching skills. The application uses semantic search to understand meaning, not just keywords, and ranks users based on two key dimensions:
 
-- **Skill relevance** to your query (vector similarity)
-- **Skill hierarchy** (prioritizes core competencies over tools)
-- **User proficiency** (advanced users rank higher)
-- **Transfer bonuses** (recognizes related technology experience)
+### Two-Dimensional Scoring
+
+**Coverage** (Breadth) - Measures how many relevant skills the user possesses
+- Each matched skill contributes based on its similarity to the query
+- Higher similarity skills contribute more (similarity²)
+- Displayed as a percentage of maximum possible coverage
+
+**Expertise** (Depth) - Measures proficiency level across matched skills
+- Beginner (1): 1.0× multiplier
+- Intermediate (2): 3.0× multiplier  
+- Advanced (3): 6.0× multiplier
+- Displayed as human-readable labels: Beginner, Early Career, Intermediate, Advanced, Expert
+
+**Final Ranking** = Coverage × Expertise
+
+This approach ensures both skill breadth and proficiency depth matter. A user with deep expertise in one highly relevant skill can rank higher than a user with many weakly relevant skills.
 
 Results are organized into score buckets (Excellent, Strong, Good, Other) with the top 5 matches always displayed.

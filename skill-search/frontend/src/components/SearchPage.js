@@ -89,9 +89,10 @@ function SearchPage() {
         {/* Query Display and New Search Button - shown at top after first search */}
         {hasSearched && (
           <div className="search-results-header">
-            <div className="query-display">
-              <span className="query-label">Search Query:</span>
-              <p className="query-text">{currentQuery}</p>
+            <div className="query-display-quotes">
+              <span className="quote-icon quote-left">"</span>
+              <p className="query-text-italic">{currentQuery}</p>
+              <span className="quote-icon quote-right">"</span>
             </div>
             <button 
               onClick={handleNewSearch}
