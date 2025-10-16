@@ -7,10 +7,21 @@ import { FiSearch, FiZap, FiUsers } from 'react-icons/fi';
  * Features:
  * - Professional tagline above centered search
  * - Visual flow with line icons: Search → Skills → Users
+ * - Search bar integrated below flow
+ * - Transparent green icon backgrounds
  * - Clean, minimal design with professional aesthetic
  * - Hidden once search results appear
  */
-function IntroScreen() {
+function IntroScreen({ onSearch, loading }) {
+  const [query, setQuery] = React.useState('');
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (query.trim()) {
+      onSearch(query);
+    }
+  };
+
   return (
     <div className="intro-screen">
       <div className="intro-content">
@@ -52,6 +63,25 @@ function IntroScreen() {
             <p className="intro-step-label">Ranked Users</p>
           </div>
         </div>
+
+        {/* Integrated Search Bar */}
+        <form onSubmit={handleSubmit} className="intro-search-form">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Enter role description or required skills..."
+            disabled={loading}
+            className="intro-search-input"
+          />
+          <button 
+            type="submit" 
+            disabled={loading || !query.trim()}
+            className="intro-search-button"
+          >
+            {loading ? 'Searching...' : 'Find Matching Users'}
+          </button>
+        </form>
       </div>
     </div>
   );

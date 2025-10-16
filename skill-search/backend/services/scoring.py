@@ -159,6 +159,15 @@ class ScoringService:
                 
                 raw_score += skill_score
                 
+                # Get parent titles for hierarchy display
+                parent_titles = user_skill.get('parent_ids', [])
+                # Convert parent IDs to titles using skills_lookup
+                parent_title_list = []
+                for parent_id in parent_titles:
+                    parent_skill = skills_lookup.get(parent_id, {})
+                    if parent_skill.get('title'):
+                        parent_title_list.append(parent_skill['title'])
+                
                 # Track details
                 matched_skills_detail.append({
                     'skill_id': skill_id,
@@ -167,7 +176,8 @@ class ScoringService:
                     'rating': rating,
                     'similarity': similarity,
                     'skill_score': skill_score,
-                    'match_type': 'direct'
+                    'match_type': 'direct',
+                    'parent_titles': parent_title_list  # Add hierarchy
                 })
                 
                 # Count technology matches (L4)
@@ -381,7 +391,7 @@ class ScoringService:
     ) -> Dict[str, Any]:
         """
         Generate detailed score breakdown for modal display.
-        Shows top skills representing 80% of total score.
+        Shows ALL matched skills sorted by contribution.
         
         Args:
             score_data: Full score data from calculate_user_score
@@ -402,20 +412,16 @@ class ScoringService:
             reverse=True
         )
         
-        # Calculate cumulative contribution to find 80% threshold
-        total_skill_score = sum(s.get('skill_score', 0) for s in sorted_skills)
-        threshold = total_skill_score * 0.8
-        cumulative = 0.0
-        top_contributors = []
+        # Build list of ALL skill contributions
+        all_contributors = []
         
         for skill in sorted_skills:
             skill_score = skill.get('skill_score', 0)
-            cumulative += skill_score
             
             # Calculate percentage of total score
             percentage = (skill_score / raw_score * 100) if raw_score > 0 else 0
             
-            top_contributors.append({
+            all_contributors.append({
                 'skill_id': skill.get('skill_id'),
                 'title': skill.get('title'),
                 'level': skill.get('level'),
@@ -423,12 +429,9 @@ class ScoringService:
                 'similarity': skill.get('similarity'),
                 'points_contributed': round(skill_score, 2),
                 'percentage_of_total': round(percentage, 1),
-                'match_type': skill.get('match_type', 'direct')
+                'match_type': skill.get('match_type', 'direct'),
+                'parent_titles': skill.get('parent_titles', [])  # Include hierarchy
             })
-            
-            # Stop when we've reached 80% (but ensure at least 3 skills if available)
-            if cumulative >= threshold and len(top_contributors) >= 3:
-                break
         
         # Determine score interpretation
         if normalized_score >= 80:
@@ -446,7 +449,7 @@ class ScoringService:
             'raw_score': round(raw_score, 2),
             'normalized_score': round(normalized_score, 2),
             'total_matched_skills': len(matched_skills_detail),
-            'skill_contributions': top_contributors,
+            'skill_contributions': all_contributors,  # All skills now
             'transfer_bonus_total': round(transfer_bonus, 2),
             'transfer_bonus_details': transfer_bonus_details,
             'score_interpretation': interpretation

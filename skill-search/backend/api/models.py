@@ -43,6 +43,7 @@ class SkillContribution(BaseModel):
     points_contributed: float  # How many points this skill added to total score
     percentage_of_total: float  # What % of user's total score this represents
     match_type: str  # 'direct' or other types
+    parent_titles: List[str] = []  # Skill hierarchy for display
 
 
 class TransferBonusDetail(BaseModel):

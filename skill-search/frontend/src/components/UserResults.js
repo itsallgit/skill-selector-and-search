@@ -53,6 +53,15 @@ function UserResults({ users, title = "Users" }) {
     return 'score-low';                         // Gray
   };
   
+  // Get score interpretation text
+  const getScoreInterpretation = (score) => {
+    if (score >= 80) return 'Excellent Match';
+    if (score >= 60) return 'Strong Match';
+    if (score >= 40) return 'Good Match';
+    if (score >= 20) return 'Fair Match';
+    return 'Weak Match';
+  };
+  
   // Format parent titles WITHOUT the skill itself at the end (since it's already in the title row)
   const formatSkillHierarchy = (parentTitles, skillTitle) => {
     if (!parentTitles || parentTitles.length === 0) {
@@ -83,7 +92,7 @@ function UserResults({ users, title = "Users" }) {
               <div className={`user-score ${getScoreColorClass(user.score)}`}>
                 <div className="score-display">
                   <span className="score-value">{user.score.toFixed(1)}</span>
-                  <span className="score-label">Score</span>
+                  <span className="score-label">{getScoreInterpretation(user.score)}</span>
                 </div>
                 {user.score_breakdown && (
                   <button 

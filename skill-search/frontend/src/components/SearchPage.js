@@ -70,14 +70,16 @@ function SearchPage() {
       </header>
       
       <div className="container">
-        {/* Search Bar - centered when no results, top when results shown */}
-        <div className={`search-container ${hasSearched && results ? 'has-results' : 'centered'}`}>
-          <SearchBar onSearch={handleSearch} loading={loading} />
-        </div>
-        
-        {/* Intro Screen - only shown when no search has been performed */}
+        {/* Intro Screen with integrated search - only shown when no search has been performed */}
         {!hasSearched && !loading && !error && (
-          <IntroScreen />
+          <IntroScreen onSearch={handleSearch} loading={loading} />
+        )}
+        
+        {/* Search Bar - shown at top after first search */}
+        {hasSearched && (
+          <div className="search-container has-results">
+            <SearchBar onSearch={handleSearch} loading={loading} />
+          </div>
         )}
       
         {/* Error Message */}
@@ -100,10 +102,16 @@ function SearchPage() {
             
             {/* Tab Content */}
             <div className="tab-content">
-              {/* Skills & Scoring Tab */}
+              {/* Relevant Skills Tab */}
               {activeTab === 'skills' && (
-                <div className="skills-scoring-tab">
+                <div className="skills-tab">
                   <SkillResults skills={results.matched_skills} />
+                </div>
+              )}
+              
+              {/* User Scoring Tab */}
+              {activeTab === 'scoring' && (
+                <div className="scoring-tab">
                   <ScoringExplanation />
                 </div>
               )}

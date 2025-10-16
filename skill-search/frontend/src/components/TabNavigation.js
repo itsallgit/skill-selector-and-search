@@ -1,46 +1,60 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * TabNavigation - Two-tab navigation for search results
+ * TabNavigation - Three-tab navigation with sliding selector
  * 
  * Features:
- * - Two tabs: "Skills & Scoring" | "Ranked Users" (default)
+ * - Three tabs: Relevant Skills | User Scoring | Ranked Users (default)
+ * - Sliding black selector pill animates to active tab
+ * - White text on selected, black text on unselected
+ * - Rounded corners, professional design
  * - Sticky on desktop, scrollable on mobile
- * - Hard separation - clicking switches visible content
- * - Clear visual indicator of active tab
- * - Minimal screen real estate
  * 
  * Props:
- * - activeTab: 'skills' | 'users' (controlled)
+ * - activeTab: 'skills' | 'scoring' | 'users' (controlled)
  * - onTabChange: (tab) => void callback
  * - skillCount: number of matched skills
  * - userCount: number of ranked users
  */
 function TabNavigation({ activeTab, onTabChange, skillCount = 0, userCount = 0 }) {
+  const [selectorStyle, setSelectorStyle] = useState({});
+  const tabRefs = useRef({});
+
+  // Update selector position when active tab changes
+  useEffect(() => {
+    const activeTabElement = tabRefs.current[activeTab];
+    if (activeTabElement) {
+      setSelectorStyle({
+        width: activeTabElement.offsetWidth,
+        transform: `translateX(${activeTabElement.offsetLeft}px)`
+      });
+    }
+  }, [activeTab]);
+
+  const tabs = [
+    { id: 'skills', label: 'Relevant Skills', count: skillCount },
+    { id: 'scoring', label: 'User Scoring', count: null },
+    { id: 'users', label: 'Ranked Users', count: userCount }
+  ];
+
   return (
     <div className="tab-navigation">
-      <div className="tab-buttons">
-        <button
-          className={`tab-button ${activeTab === 'skills' ? 'active' : ''}`}
-          onClick={() => onTabChange('skills')}
-          aria-pressed={activeTab === 'skills'}
-        >
-          <span className="tab-label">Skills & Scoring</span>
-          {skillCount > 0 && (
-            <span className="tab-count">{skillCount}</span>
-          )}
-        </button>
-        
-        <button
-          className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => onTabChange('users')}
-          aria-pressed={activeTab === 'users'}
-        >
-          <span className="tab-label">Ranked Users</span>
-          {userCount > 0 && (
-            <span className="tab-count">{userCount}</span>
-          )}
-        </button>
+      <div className="tab-container">
+        <div className="tab-selector" style={selectorStyle}></div>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            ref={(el) => (tabRefs.current[tab.id] = el)}
+            className={`tab-button-pill ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => onTabChange(tab.id)}
+            aria-pressed={activeTab === tab.id}
+          >
+            <span className="tab-label">{tab.label}</span>
+            {tab.count !== null && tab.count > 0 && (
+              <span className="tab-count">{tab.count}</span>
+            )}
+          </button>
+        ))}
       </div>
     </div>
   );
