@@ -92,7 +92,6 @@ function SearchPage() {
             <div className="query-display-quotes">
               <span className="quote-icon quote-left">"</span>
               <p className="query-text-italic">{currentQuery}</p>
-              <span className="quote-icon quote-right">"</span>
             </div>
             <button 
               onClick={handleNewSearch}
